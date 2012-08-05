@@ -15,6 +15,7 @@ import os
 import rbc_npy2Perseus as R
 from multiprocessing import Pool
 from subprocess import call
+import pickle as pkl
 
 def perseus ( type, fname, output ):
     """
@@ -37,6 +38,17 @@ def run_perseus_All ( type, dir, output):
             cellOutput.append(output+f+'/')#no +f if want in ..-all directory
     while cellFolders:
         run_perseus (type, cellFolders.pop(0), cellOutput.pop(0) )#perseus for frames of cell
+
+def run_perseus_More ( type='scubtop' ):
+    """
+        Collects all cells in same directory (say '../New') and runs perseus
+        Note: dir, output need to end with '/'
+    """
+    fnames = pkl.load(open('moreFileNames.pkl','r'))
+    outnames = pkl.load(open('morePersFiles.pkl','r'))
+    
+    for cAbbr in fnames:
+        run_perseus (type, fnames[cAbbr], outnames[cAbbr] )#perseus for frames of cell
 
 def run_perseus_All_parallel ( dir, output):
     """

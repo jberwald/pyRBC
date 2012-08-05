@@ -1,6 +1,8 @@
 """
     
-Module to computing clusters of persistence diagrams, also various functions for related tasks
+    SAME FUNCTIONALITY AS RBC_CLUSTER
+    
+    FOR USE ON DUPLEX (HENCE _d)
 
     e.g. files on simplex:
         '/data/jberwald/wyss/data/Cells_Jesse/New/frames/new_110125/'    
@@ -50,7 +52,7 @@ def dmat_parallel (cells, files, frameList, output, type, b_num):
     data[j][i] = dist
     saveMatrix(data, output)
 
-def dmat (cells, files, frameList, type, b_num, save='NO', output='NIL', tOut='/data/tOut.txt'):
+def dmat (cells, files, frameList, type, b_num, save='NO', output='NIL', tOut = '/export/duplex/kspendlove/data/tOut.txt'):
     """
         Simplified distance matrix creation
         Argument description:
@@ -89,7 +91,7 @@ def dmat (cells, files, frameList, type, b_num, save='NO', output='NIL', tOut='/
         (f_ind, f) = f
         (g_ind, g) = g
         if g_ind >= f_ind:  #exploiting symmetry
-            dist = persistence_distance(type,f,g,cellDict[f],cellDict[g],tOut)
+            dist = persistence_distance(type,f,g,cellDict[f],cellDict[g], tOut)
             data[f_ind][g_ind] = dist
             data[g_ind][f_ind] = dist
     if save == 'YES':
@@ -145,7 +147,7 @@ def dvec ( cell, file, frameList, type, b_num, save='NO', output='NIL'):
         saveMatrix(data,output)
     return data
 
-def dlag_vec (cell, files, lag, type, b_num, tempOut='/data/tOut.txt', save='NO', output='NIL'):
+def dlag_vec (cell, files, lag, type, b_num, tempOut='/export/duplex/kspendlove/data/tOut.txt', save='NO', output='NIL'):
     """
         Compute lag vector
         Arguments are similar as above
@@ -191,9 +193,9 @@ def persistence_distance (type, persFile1, persFile2, fname1, fname2,tempOut, p=
     print persFile1
     print persFile2
     if type.startswith('b'):
-        call(['/home/kellys/Dropbox/WM/KellySpendlove/metric/kel_metric/bottleneck/bd', persFile1, persFile2, str(maxl), str(maxl2), tempOut])
+        call(['/export/duplex/kspendlove/Dropbox/KellySpendlove/metric/kel_metric/bottleneck/bd', persFile1, persFile2, str(maxl), str(maxl2), tempOut])
     else:
-        call(['/home/kellys/Dropbox/WM/KellySpendlove/metric/kel_metric/wasserstein/src/wass', persFile1, persFile2, str(p), str(maxl), str(maxl2), tempOut])
+        call(['/export/duplex/kspendlove/Dropbox/KellySpendlove/metric/kel_metric/wasserstein/src/wass', persFile1, persFile2, str(p), str(maxl), str(maxl2), tempOut])
     with open(tempOut, 'r') as f:
         d = float(f.read())
     f.closed
@@ -232,63 +234,3 @@ def natural_key(string_):
     Use with frames.sort(key=natural_key)
     """
     return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', string_)]
-
-#Deprecated Functions 6/12/2012
-
-def create_dist_matrix (cells, files, frameList, output, type, b_num):
-    """
-        DEPRECATED (USE DMAT).
-        POTENTIAL BUG.
-        cells -  array of paths to cells for each cell, ex:
-        '/data/PerseusOutput/..'
-        files - array of paths to corresponding data files
-        '/data/jberwald/wyss/...'
-        frameList - list of desired frame indices (start at 0)
-        --------DEPRECATED-----
-        """
-    nFrames = len(cells)*len(frameList)
-    data = numpy.zeros((nFrames,nFrames), dtype=numpy.uint16)
-    for i in xrange(len(cells)):
-        dlist = os.listdir(cells[i])
-        cellFrames = []
-        #for each frame
-        for f in dlist:
-            #if ends with correct betti number
-            if f.endswith(str(b_num)+'.txt'):
-                #if the index of array (.._99_..) is in frameList
-                if numpy.where(frameList == int(f.split('_')[2]))[0].size > 0:
-                    trueVal = 0
-                    # check whether desired category (ex new_110125)
-                    for file in files:
-                        if f.split('-')[0] == file.split('/')[-2]:
-                            trueVal = 1
-                    if trueVal == 1: #if true append
-                        cellFrames.append(f)
-        cellFrames.sort(key=natural_key)
-        for j in xrange(len(cells)):
-            if j >= i:
-                dlist2 = os.listdir(cells[j])
-                cellFrames2 = []
-                for f in dlist:
-                    if f.endswith(str(b_num)+'.txt'):
-                        if numpy.where(frameList == int(f.split('_')[2]))[0].size > 0:
-                            trueVal = 0
-                            for file in files:
-                                if f.split('-')[0] == file.split('/')[-2]:
-                                    trueVal = 1
-                            if trueVal == 1:
-                                cellFrames2.append(f)
-                cellFrames2.sort(key=natural_key)
-                #get index and frame
-                for ind, frame in zip(xrange(len(cellFrames)),cellFrames):
-                    persOut = cells[i] + frame
-                    fname = files[i] + frame[:-6] + '.npy'
-                    #get index and frame of associated cells
-                    for ind2, frame2 in zip(xrange(len(cellFrames2)),cellFrames2):
-                        persOut2 = cells[j] + frame2
-                        fname2 = files[j] + frame2[:-6] + '.npy'
-                        dist = persistence_distance(type,persOut,persOut2,fname,fname2)
-                        data[ind*i][ind2*j] = dist
-                        data[ind2*j][ind*i] = dist
-    saveMatrix(data, output)
-

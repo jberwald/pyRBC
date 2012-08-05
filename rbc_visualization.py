@@ -10,7 +10,7 @@ created by kel 6/5/2012
 
 import numpy
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
 import itertools as it
@@ -29,6 +29,30 @@ def plot_frame( frame ):
     fig = plt.figure()
     plt.title("RBC frame")
     plt.imshow(data)
+    plt.colorbar()
+    plt.show()
+
+def plot_block_frame( frame, ind ):
+    """
+        Use pylab.imshow() to plot a frame (npy array). 
+        Note: The boundary should be removed, thus there will not be a halo
+        """
+    data = numpy.load(frame)[:,:,ind]
+    fig = plt.figure()
+    plt.title("RBC frame")
+    plt.imshow(data)
+    plt.colorbar()
+    plt.show()
+
+def plot_frame_std( frame ):
+    """
+        Use pylab.imshow() to plot a frame (npy array). 
+        Note: The boundary should be removed, thus there will not be a halo
+        """
+    data = numpy.load(frame)
+    fig = plt.figure()
+    plt.title("RBC frame")
+    plt.imshow(data,vmin=0,vmax=3750)
     plt.colorbar()
     plt.show()
 
@@ -66,14 +90,14 @@ def plot_block( files, m, n ):
     plt.colorbar()
     plt.show()
 
-def plot_sublevels (file, persFile, output, interval, mask='n'):
+def plot_sublevels (file, persFile, output, interval, mask=False):
     """
         plots sublevel sets for specified numpy file
         from the height values in associated persFile
         output is directory for output files (indv. names come from file + height)
         interval provides info on what frames to save
             (i.e. interval==2 means every other frame )
-        if mask=='y' all sublevel values are set to 1
+        if mask==True all sublevel values are set to 1
     """
     if not output.endswith('/'):
         output+='/'
@@ -89,19 +113,19 @@ def plot_sublevels (file, persFile, output, interval, mask='n'):
         if ind % interval == 0:
             temp = data.copy()
             temp[numpy.where(temp>int(h))] = 0
-            if mask == 'y':
+            if mask:
                 temp[numpy.where(temp!=0)] = 1
             outName = file.split('/')[-1].rstrip('.npy') + '_' + h
             rp . save_npy_as_png ( temp, output + outName)
 
-def plot_sublevels_comp (file, slice, output, interval, persFile='NULL', mask='NO'):
+def plot_sublevels_comp (file, slice, output, interval, persFile='NULL', mask=False):
     """
         plots sublevel sets for specified numpy file
         from the height values in associated persFile
         output is directory for output files (indv. names come from file + height)
         interval provides info on what frames to save
         (i.e. interval==2 means every other frame )
-        if mask=='y' all sublevel values are set to 1
+        if mask==True all sublevel values are set to 1
         """
     if not output.endswith('/'):
         output+='/'
@@ -122,12 +146,12 @@ def plot_sublevels_comp (file, slice, output, interval, persFile='NULL', mask='N
         if ind % interval == 0:
             temp = data.copy()
             temp[numpy.where(temp>int(h))] = 0
-            if mask == 'YES':
+            if mask:
                 temp[numpy.where(temp!=0)] = 1
             outName = file.split('/')[-1].rstrip('.npy') + '_' + str(slice) +'_' + str(h)
             rp . save_npy_as_png ( temp, output + outName +'.png')
 
-def plot_interlevels (file, persFile, output, interval, r, mask='NO'):
+def plot_interlevels (file, persFile, output, interval, r, mask=False):
     """
         plots interlevels sets for specified numpy file
         from the height values in associated persFile (USE .BETTI FILE)
@@ -139,7 +163,7 @@ def plot_interlevels (file, persFile, output, interval, r, mask='NO'):
         r perburation to height function (use half of desired window)
         Use half interval to capture every height value (if all height values present)
         
-        if mask=='YES' all sublevel values are set to 1
+        if mask==True all sublevel values are set to 1
         """
     if not output.endswith('/'):
         output+='/'
@@ -157,7 +181,7 @@ def plot_interlevels (file, persFile, output, interval, r, mask='NO'):
             lower = int(h) - r
             upper = int(h) + r
             temp[(temp>upper)|(temp<lower)] = 0
-            if mask == 'YES':
+            if mask:
                 temp[numpy.where(temp!=0)] = 1
             outName = file.split('/')[-1].rstrip('.npy') + '_'+h+'-'+str(lower)+'-'+str(upper)
             rp . save_npy_as_png ( temp, output + outName + '.png')

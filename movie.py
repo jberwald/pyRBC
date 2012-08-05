@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import sys, os, subprocess
+from subprocess import call
+import rbc_npy2Perseus as n2p
 """
 Make a movie from PNG files. Assumed that this script resides in the
 folder containing a sequence of frames (PNG files).
@@ -31,49 +33,36 @@ def patch_cover( dlist, prefix, suffix='png'):
     a = prefix_files( dlist, prefix )
     return suffix_files( a, suffix ) 
 
-def run(files, output):
-
-    command = ('mencoder',
-               files,
-               '-mf',
-               'type=png:h=800:w=400:fps=8',
-               '-ovc',
-               'lavc',
-               '-lavcopts',
-               'vcodec=avi',
-               '-oac',
-               'copy',
-               '-o',
-               output)
-
-    print command
-
-    print "Making movie from " + prefix + " barcode images..."
-    #os.spawnvp(os.P_WAIT, 'mencoder', command)
-    subprocess.call( command )
-
-
-if __name__ == "__main__":
-
-    # prefix for cover files
-    try:
-        # file name prefix
-        prefix = sys.argv[1]
-    except IndexError:
-        prefix = "cantorMF4_2D_0.9"
-
-    dlist = os.listdir( '.' )
-    flist = patch_cover( dlist, prefix )
-    flist= sort_files( flist )
-
-    fname = prefix + ".clist"
-    with open( fname, 'w' ) as fh:
-        for x in flist:
-            fh.write( x + "\n" )
-    
-    #files = 'mf://' + prefix + '*.png'
-    files = 'mf://@' + fname
-    output = prefix + '.avi'
-    #output = prefix + '.mpeg'
-
-    run( files, output )
+def run(dir, output, prgm='mencoder'):
+    if not output.endswith('.mp4'):
+        output+='.mp4'
+    if not dir.endswith('/'):
+        dir+='/'
+    if os.path.isdir (dir):
+        dlist = os.listdir(dir)
+        frames = []
+        for f in dlist:
+            if f.endswith('npy') and not os.path.isdir(dir+f):
+                frames.append(dir+f)
+    else:
+        print 'Error - input is not a directory'
+        return
+    #print frames
+    frames.sort(key=n2p.natural_key)
+    print '..creating movie..'
+    if prgm.startswith('m'):
+        call(['mencoder',
+           frames,
+           '-mf',
+           'type=png:h=800:w=400:fps=34',
+           '-ovc',
+           'lavc',
+           '-lavcopts',
+           'vcodec=avi',
+           '-oac',
+           'copy',
+           '-o',
+           output])
+    else:
+        call(['ffmpeg', '-qscale 5', '-r 34', '-b 9600', 'data/jberwald/wyss/data/Cells_Jesse/New/frames/new_110125/new_110125-concatenated-ASCII_%.npy', output ])
+    print '..finished..'

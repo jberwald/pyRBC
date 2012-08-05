@@ -71,8 +71,8 @@ def diff_image (files, savedir):
 
 def k_diff_image (files, savedir, k):
     """
-        savedir needs to be directory
-        """
+    savedir needs to be directory
+    """
     if os.path.isdir(files):
         fdir = files + '/'
         dlist = os.listdir(fdir)

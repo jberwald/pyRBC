@@ -25,10 +25,15 @@ removed.)
 """
 
 import numpy
-from pylab import *
+#from pylab import *
 import re
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+import matplotlib.cm as cmx
+import rbc_processing as rp
 import sys
 
+slash = '/'
 
 def natural_key(string_):
     """
@@ -83,51 +88,98 @@ def extract_frames( fname, bnd ):
         #numpy.save( savedir + cell_name + '_' + str(k), arr )
         savefunc( savedir + cell_name + '_' + str(k), arr )
 
-def cell2npy ( cell_file, bnd_file, shape=(182,196) ):
-    """
-    Convert a cell file with one frame per line to a numpy file
-    containing a 3d array of matrices.
-    """
-    # unroll the shape tuple
-    rows, cols = shape
-    bnd = numpy.loadtxt ( bnd_file, dtype=int )
-    
-    if len( bnd.shape ) > 1:
-        bnd = bnd.ravel()
-
-    print "bnd.shape", bnd.shape[0]
-
-    if bnd.shape[0] != rows*cols:
-        print "WRONG SHAPE!!"
-        sys.exit(1)
-    
-    # deal with windows' new line issues
-    frames = []
-    print "Converting txt file to numpy arrays..."
-    with open ( cell_file, 'rU' ) as fh:
-        for line in fh.readlines():
-            tmp = bnd * numpy.fromstring( line, sep='\t', dtype=int )
-            #tmp = numpy.fromstring( line, sep='\t', dtype=int )
-            frames.append ( tmp.reshape ( shape ) )
-    print "Stacking frames..."
-    cell = numpy.dstack ( frames )
-    del frames # clear some memory 
-
-               #return frames[0], bnd
-
-    print "Saving file..."
-    numpy.save ( cell_file+'.npy', cell )
-    print "Saved file:", cell_file+'.npy'
-
 def plot_frame( frame ):
     """
     Use pylab.imshow() to plot a frame. Note: if the bounday has not
     been extracted, then there will be a halo. (See # remove bounday
     in extract_frames() above.)
     """
-    fig = figure()
+    fig = plt.figure()
     ax = fig.gca()
     ax.set_title( "RBC frame" )
     ax.imshow( frame )
     fig.show()
+
+def plot_frame_mask_zero( frame, nx=203, ny=198 ):
+    """
+    Use pylab.imshow() to plot a frame. Mask the elements of the image
+    matrix that are zero.
+    """
+    frame.resize((nx,ny))
+
+    cdict = {'red': ((0., 1, 1),
+                     (0.05, 1, 1),
+                     (0.11, 0, 0),
+                     (0.66, 1, 1),
+                     (0.89, 1, 1),
+                     (1, 0.5, 0.5)),
+            'green': ((0., 1, 1),
+                      (0.05, 1, 1),
+                      (0.11, 0, 0),
+                      (0.375, 1, 1),
+                      (0.64, 1, 1),
+                      (0.91, 0, 0),
+                      (1, 0, 0)),
+            'blue': ((0., 1, 1),
+                     (0.05, 1, 1),
+                     (0.11, 1, 1),
+                     (0.34, 1, 1),
+                     (0.65, 0, 0),
+                     (1, 0, 0))}
+
+    my_cmap = colors.LinearSegmentedColormap('my_colormap',cdict,256)
+    fig = plt.figure( frameon=False, dpi=160 )
+    ax = fig.gca()
+    ax.set_xticks( [] )
+    ax.set_yticks( [] )
+    im = ax.imshow( frame, cmap=my_cmap )
+    cbar = plt.colorbar( im, shrink=0.6 )
+    fig.show()
+    return fig
     
+def plot_sublevel_set( fname, bndfile=None, persfile=None,
+                       height=None, mask=False, nx=203, ny=198 ):
+    """
+    Plot sublevel set for a cell <fname> (full path to cell).
+    """
+    data = numpy.loadtxt( fname )
+    print data.shape
+    if bndfile:
+        bnd = numpy.loadtxt( bndfile )
+        print bnd.shape
+        data = bnd.ravel() * data
+        data.resize( (nx,ny) )
+    if persfile:
+        heightList = [x[1:-1] for x in re.findall('\[[^\]]*\]',s)]
+    elif height:
+        heightList = [height]
+    else:
+        print "Must provide either a path to a Perseus output file or a single height for the sublevel set"
+        sys.exit( 1 )
+
+    # make an RBG array to hold (x,y,z) data at each pixel
+    G = numpy.zeros((nx,ny,3), dtype=int)
+    
+    outdir = slash.join( fname.split( '/' )[:-1] ) + '/'
+    for ind, h in enumerate(heightList):
+        #temp = data.copy()
+        G[ numpy.where( data > int(h) ) ] = [1,1,1]
+        if mask:
+            G[ numpy.where( data <= int(h) ) ] = [0,0,160]
+            G[ numpy.where( data == 0 ) ] = [1,1,1]
+        outName = fname.split('/')[-1][:-4] + '_' + str( h )
+        output = outdir + outName
+        # now plot stuff
+        fig = plt.figure( frameon=False )
+        ax = fig.gca()
+        #ax.set_title('RBC ' + output)
+        ax.imshow( G )
+        ax.set_xticks( [] )
+        ax.set_yticks( [] )
+        fig.show()
+        #plt.colorbar()
+        print "saving images to", output
+        fig.savefig( output + '.png', dpi=160 )
+        fig.savefig( output + '.pdf', dpi=160 )
+    return G
+
