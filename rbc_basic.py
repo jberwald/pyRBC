@@ -137,49 +137,53 @@ def plot_frame_mask_zero( frame, nx=203, ny=198 ):
     fig.show()
     return fig
     
-def plot_sublevel_set( fname, bndfile=None, persfile=None,
-                       height=None, mask=False, nx=203, ny=198 ):
+def plot_sublevel_set( fname, height, bndfile=None, persfile=None,
+                       mask=False, nx=203, ny=198 ):
     """
     Plot sublevel set for a cell <fname> (full path to cell).
     """
-    data = numpy.loadtxt( fname )
+    h = height
+    # text file
+    try:
+        data = numpy.loadtxt( fname )
+    # numpy file
+    except ValueError:
+        data = numpy.load( fname )
     print data.shape
     if bndfile:
         bnd = numpy.loadtxt( bndfile )
         print bnd.shape
         data = bnd.ravel() * data
         data.resize( (nx,ny) )
-    if persfile:
-        heightList = [x[1:-1] for x in re.findall('\[[^\]]*\]',s)]
-    elif height:
-        heightList = [height]
-    else:
-        print "Must provide either a path to a Perseus output file or a single height for the sublevel set"
-        sys.exit( 1 )
 
-    # make an RBG array to hold (x,y,z) data at each pixel
+    # make an array to hold (R,G,B) data at each pixel
     G = numpy.zeros((nx,ny,3), dtype=int)
-    
+
+    # make output directory
     outdir = slash.join( fname.split( '/' )[:-1] ) + '/'
-    for ind, h in enumerate(heightList):
-        #temp = data.copy()
-        G[ numpy.where( data > int(h) ) ] = [1,1,1]
-        if mask:
-            G[ numpy.where( data <= int(h) ) ] = [0,0,160]
-            G[ numpy.where( data == 0 ) ] = [1,1,1]
-        outName = fname.split('/')[-1][:-4] + '_' + str( h )
-        output = outdir + outName
-        # now plot stuff
-        fig = plt.figure( frameon=False )
-        ax = fig.gca()
-        #ax.set_title('RBC ' + output)
-        ax.imshow( G )
-        ax.set_xticks( [] )
-        ax.set_yticks( [] )
-        fig.show()
-        #plt.colorbar()
-        print "saving images to", output
-        fig.savefig( output + '.png', dpi=160 )
-        fig.savefig( output + '.pdf', dpi=160 )
-    return G
+    #temp = data.copy()
+    G[ numpy.where( data > int(h) ) ] = [1,1,1]
+    if mask:
+        print numpy.where( data <= int(h) )
+        # the sublevel set
+        G[ numpy.where( data <= int(h) ) ] = [0,0,160]
+        # everything outside 
+        G[ numpy.where( data == 0 ) ] = [1,1,1]
+    # make output name here
+    outName = fname.split('/')[-1][:-4] + '_' + str( h )
+    output = outdir + outName
+    # now plot stuff
+    fig = plt.figure( frameon=False )
+    ax = fig.gca()
+    ax.set_frame_on( False )
+    #ax.set_title('RBC ' + output)
+    ax.imshow( G )
+    ax.set_xticks( [] )
+    ax.set_yticks( [] )
+    fig.show()
+    #plt.colorbar()
+    print "saving images to", output
+    fig.savefig( output + '.png', dpi=160 )
+    fig.savefig( output + '.pdf', dpi=160 )
+    return G, fig
 

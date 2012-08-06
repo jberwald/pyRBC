@@ -65,10 +65,8 @@ def band_pass( X, dx, dy ):
 
 if __name__ == "__main__":
 
-    theDir = '/Users/jberwald/Dropbox/Papers/BioMath/rbc/data/'
-    frame = theDir + 'new11_frame2000.txt'
-    bfile =  theDir + 'boundary_Nov_new110125'
-    orig_frame = theDir + 'new11_original.npy'
+    from local_settings import *
+  
     img = load_image( frame )
     orig = np.load( orig_frame )
 
@@ -93,28 +91,60 @@ if __name__ == "__main__":
         Yhalo = ifft_image( Hhalo )
         Yhalo = spectral_power( Yhalo )
 
-        # draw stuff 
-        fig = pylab.figure( i, figsize=(10,8) )
-        # boundary removed
-        ax1 = fig.add_subplot( 131 )
-        ax1.imshow( img )
-        # label the row
-        ax1.set_ylabel( 'Boundary removed', fontsize=18 )
-        ax1.set_title( 'Intensity function', fontsize=18 )
-        # fig.colorbar( ax=ax1, cax=ax1 )
+        if 0:
+            # draw stuff 
+            fig1 = pylab.figure(1, dpi=160) # i, figsize=(10,8) )
+            # boundary removed
+            ax1 = fig1.add_subplot( 111 )
+            ax1.imshow( img )
+            ax1.set_xticks( [] )
+            ax1.set_yticks( [] )
+            # label the row
+            # ax1.set_ylabel( 'Boundary removed', fontsize=18 )
+            #ax1.set_title( 'Intensity function', fontsize=18 )
+            # fig.colorbar( ax=ax1, cax=ax1 )
+            fig1.show()
 
-        # first few modes
-        ax2 = fig.add_subplot( 132 )
-        ax2.imshow( Y )
-        ax2.set_title( r''+str( num_modes ) + ' modes' )
+        if 0:
+            # first few modes
+            fig2 = pylab.figure(2, dpi=160)
+            ax2 = fig2.add_subplot( 111 )
+            ax2.imshow( Y )
+            #ax2.set_title( r''+str( num_modes ) + ' modes' )
+            ax2.set_xticks( [] )
+            ax2.set_yticks( [] )
+            fig2.show()
 
-        # slices of img and Y
-        ax3 = fig.add_subplot( 133 )
-        ax3.plot( img[row,:], 'b-', lw=2, label='cell' )
-        ax3.plot( Y[row,:], 'r-', lw=2, label='FFT approx.' )
-        ax3.set_title( r'Horizontal slice along center' )
-        ax3.set_aspect_ratio( 'equal' )
-        ax3.legend()
+        if 1:
+            # slices of img and Y
+            height = 1400
+            fig3 = pylab.figure(3, dpi=160)
+            ax3 = fig3.add_subplot( 111 )
+            ax3.plot( img[row,:], 'b--', lw=3, label=r'Intensity $f(x,y)$' )
+            ax3.plot( Y[row,:], 'g-', lw=4, label=r'Approx.' )
+            ax3.hlines( height-1, 1, 197, linestyle='dotted', linewidth=2 )        
+
+            # find sublevel set
+            # mask regions above height and fill those below
+            y1 = Y[row,:]
+            w = np.where( y1 <= height )[0]
+            y2 = y1[w]
+            y_masked = np.ma.masked_greater( y1, height )
+            ax3.fill_between( range(0,Y.shape[1]), 0, y_masked, where=y_masked<=height,
+                              facecolor='green', alpha=0.5, interpolate=True,
+                              label=r'Sublevel set')
+                #ax3.set_title( r'Horizontal cross-section', fontsize=24 )
+            #        ax3.set_aspect( 'equal', 'box' )
+            ax3.set_xlim( [0,197] )
+            xticks = [ str( int(x) ) for x in ax3.get_xticks() ]
+            yticks = [ str( int(y) ) for y in ax3.get_yticks() ]
+            ax3.set_xticklabels( xticks, fontsize=20 )
+            ax3.set_yticklabels( yticks, fontsize=20 )        
+            leg = ax3.legend()
+            for t in leg.get_texts():
+                t.set_fontsize('small')
+            fig3.show()
+
 
         # ## HALO ##
         # # original without boudnary removed
@@ -132,7 +162,7 @@ if __name__ == "__main__":
         # ax6.plot( Yhalo[row,:], 'r-', lw=2, label='FFT approx.' )
         # #ax6.set_title( r'Sliced along row='+str(row) )
 
-        fig.savefig( theDir + 'cell_approx_' + str(num_modes) + 'modes.png' )
+        #fig.savefig( theDir + 'cell_approx_' + str(num_modes) + 'modes.png' )
 
-        fig.show()
+        # fig1.show()
     

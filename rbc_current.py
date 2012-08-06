@@ -469,7 +469,7 @@ def plot_hist( fname, color='blue', normed=False, fontsize=20 ):
     plt.show()
     return fig
 
-def multi_file_hist( fdir, betti=1 ):
+def dir_list( fdir, betti=1 ):
     """
     Returns a list of Perseus output files for given betti #.
     """
