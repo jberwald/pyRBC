@@ -4,7 +4,7 @@ import csv
 import os
 
 
-def cell2npy( fname ):
+def cell2npy( fname, skip=0 ):
     """
     Sometimes a cell image is stored in a DOS file format, with
     approximately 200 lines. This reads the file and converts the
@@ -20,9 +20,9 @@ def cell2npy( fname ):
     reader = csv.reader( open( fname, 'rU' ), delimiter='\t' )
     lines = list( reader )
     # convert strings to ints
-    rows = [ [ int( val ) for val in row[:-1] ] for row in lines[4:] ]
+    rows = [ [ int( val ) for val in row[:-1] ] for row in lines[skip:] ]
     try:
-        return numpy.vstack( rows[4:] )
+        return numpy.vstack( rows[skip:] )
     except ValueError:
         print "problem with rows, here are the first 10:", rows[:10]
                        

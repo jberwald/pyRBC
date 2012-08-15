@@ -35,6 +35,35 @@ import sys
 
 slash = '/'
 
+def cell2npy( cell, bnd, rows=(203,198) ):
+    """
+    Convert a concatenated text file to a NPY file.
+
+    fname -- full path to concatenated file
+
+    bname -- full path to boudnary file
+
+    row -- dimensions (tuple)
+    """
+    bnd_arr = numpy.loadtxt( bnd )
+    frames = []
+    with open( cell, 'rU' ) as fh:
+        print "opened", cell
+        fromstring = numpy.fromstring
+        print "converting lines..."
+        for line in fh.readlines():
+            arr = fromstring( line, sep='\t' )
+            # remove boundary 
+            arr = bnd_arr.ravel() * arr
+            arr.resize( rows )    
+            frames.append( arr )
+    savefile = cell + '.npy'
+    print "saving file to", savefile
+    stack = numpy.dstack( frames )
+    numpy.save( savefile, stack )
+    return stack
+    
+
 def natural_key(string_):
     """
     Use with frames.sort(key=natural_key)
