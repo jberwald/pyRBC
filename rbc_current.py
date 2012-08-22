@@ -12,6 +12,7 @@ import numpy
 import matplotlib.pyplot as plt
 import re
 import os
+import time
 import cPickle as pkl
 from collections import defaultdict
 
@@ -588,158 +589,69 @@ def plot_midrange_ts( new_file, old_file, skip=10, fontsize=20, lines=None ):
 
 def plot_hist_cut_axis( cell, color='blue',
                         normed=False, fontsize=20,
-                        threshold=50, cell_type='New',
+                        cell_type='New',
                         show_plot=False, log=False,
-                        left_xlim=300, right_xlim=1600):
+                        left_xlim=300, right_xlim=1600,
+                        cutoff=0.08, ts_max=100, histtype='stepfilled' ):
     """
-    Plot a histogram of generator lifespan along the diagonal. This
-    allows more control over bin color.
+    Plot a histogram of generator lifespans computed as distance from diagonal.
 
     cell -- full path to perseus output file.
     """
     from mpl_toolkits.axes_grid.inset_locator import inset_axes, zoomed_inset_axes
     from mpl_toolkits.axes_grid.inset_locator import mark_inset
+
+    # timing
+    start = time.time()
     
     # cell is a list of frames
     # create an array with first entry in cell, then extend in
     # loop
-    ts = get_ts ( cell[0] )
+    ts = [ get_ts( cell[0] ) ]
     #    ts = ts[:-1]
-    for f in cell[1:]:
-        new_ts = get_ts ( f )
+    for f in cell[1:ts_max]:
+        ts.append( get_ts( f ) )
+        #new_ts = get_ts ( f )
         # the (almost) infinite generator overwhelms the plot
         #      new_ts = new_ts[:-1]
         # extend last ts of generators by new_ts
-        ts = numpy.hstack( ( ts, new_ts ) )
+        #ts = numpy.hstack( ( ts, new_ts ) )
         # the histogram of the data
         #vals = vals[1:]
+    # convert and normalize
+    ts = numpy.hstack( ts )
+    ts = numpy.asarray( ts, dtype=numpy.float )
+    ts /= ts.max()
  
+    print "Done creating time series. Took", time.time() - start, " seconds"
 
-        # This method works with mpl 0.99 (plt.subplot() works with >1.1.0 )
-        fig = plt.figure( dpi=160 )
-        ax = fig.add_subplot( 121 ) 
-        ax2 = fig.add_subplot( 122 )
-
-        #### DEBUGGING ####
-        ts = ts[:100]
-
-        # create two identical histograms 
-        n, bins, patches = ax.hist( ts, bins=(ts.max()-ts.min()),\
-                                    normed=normed, facecolor=color,\
-                                    alpha=0.75, histtype='bar', log=log, rwidth=20 )
-        n, bins, patches = ax2.hist( ts, bins=(ts.max()-ts.min()),\
-                                     normed=normed, facecolor=color,\
-                                     alpha=0.75, histtype='bar', log=log, rwidth=20 )
-
-        # make the inset
-        # options of loc: BEST, UR, UL, LL, LR, R, CL, CR, LC, UC, C = range(11)
-        #axins = zoomed_inset_axes(ax, 10, loc=10 ) # ( axes, zoom power, location )
-        axins = inset_axes( ax, width='70%', height=1., loc = 10 )
-        axins.hist( ts, bins=(ts.max()-ts.min()),\
-                    normed=normed, facecolor=color,\
-                    alpha=0.75, histtype='bar', log=log, rwidth=20 )
-        # set box position by hand
-
-        # pos = [left, bottom, width, height]
-        # axins.set_position
-
-        # hide spines between axes
-        ax.spines['right'].set_visible(False)
-        ax.xaxis.tick_bottom()
-        ax.yaxis.tick_left()
-        # the tail side
-        ax2.spines['left'].set_visible(False)
-        ax2.xaxis.tick_bottom()
-        ax2.yaxis.tick_right()
-        #ax2.set_yticks( [] )
-        #ax.tick_params(labeltop='off') # don't put tick labels at the top
-
-
-        d = .015 # how big to make the diagonal lines in axes coordinates
-        # arguments to pass plot, just so we don't keep repeating them
-        # remember, plot takes list of x's, followed by list of y's
-        kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-        ax.plot((1-d,1+d),(-d,+d), **kwargs)      # bottom-right diagonal
-        ax.plot((1-d,1+d),(1-d,1+d), **kwargs)    # top-right diagonal
-
-        kwargs.update(transform=ax2.transAxes)  # switch to the right axes
-        ax2.plot((-d,+d),(-d,+d), **kwargs)   # bottom-left diagonal
-        ax2.plot((-d,+d),(1-d,1+d), **kwargs) # top-left diagonal
-
-       # zoom-in / limit the view to different portions of the data
-        ax.set_xlim( 0., left_xlim ) # most of the data
-        ax.set_ylim( 0., n.max()+5 )
-        ax2.set_xlim( right_xlim, ts.max()+5) # outliers/inf gens
-        ax2.set_ylim( 0., 60. )  # zoom in to see the inf gens
-
-        # sub region of the original image
-        yscale = n.max() * (1./60)
-        xmax = 250.
-        x1, x2, y1, y2 = 25, xmax, 0, yscale
-        axins.set_xlim(x1, x2)
-        axins.set_ylim(y1, y2)
-        axins.set_aspect( xmax/yscale )
-        # draw a bbox of the region of the inset axes in the parent axes and
-        # connecting lines between the bbox and the inset axes area
-        mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
-    fig.subplots_adjust( wspace=0.1 )
-    plt.show()
-    
-    return fig, ts
-
-def plot_hist_stack( cells, color='blue',
-                     normed=False, fontsize=20,
-                     threshold=50, cell_type='New',
-                     show_plot=False, log=False,
-                     left_xlim=300, right_xlim=1600,
-                     nbins=1000.):
-    """
-    cells -- list of cells (full paths to) whose generator lifespans
-    we want to stack in a single histogram.
-    """
-    from mpl_toolkits.axes_grid.inset_locator import inset_axes, zoomed_inset_axes
-    from mpl_toolkits.axes_grid.inset_locator import mark_inset
-    # ==========  ========
-    # character   color
-    # ==========  ========
-    # 'b'         blue
-    # 'g'         green
-    # 'r'         red
-    # 'c'         cyan
-    # 'm'         magenta
-    # 'y'         yellow
-    # 'k'         black
-    # 'w'         white
-    # ==========  ========
-    colors = ['b','g','r','c','m','y']
-    nbins = float( nbins )
-    # cell is a list of frames
-    # create an array with first entry in cell, then extend in
-    # loop
-
-    # This method works with mpl 0.99 (plt.subplot() works with >1.1.0 )
+    # This method works with mpl 0.99 ( plt.subplot() works with >1.1.0 )
     fig = plt.figure( dpi=160 )
     ax = fig.add_subplot( 121 ) 
     ax2 = fig.add_subplot( 122 )
 
-    # cell == cell directory containing persistence diagrams
-    old_ts = None
-    for cell in cells:
-        ts = get_ts ( cell[0] )
-        # concatenate all of the diagram lifespans into one timeseries
-        for f in cell[1:]:
-            new_ts = get_ts ( f )
-            # extend last ts of generators by new_ts
-            ts = numpy.hstack( ( ts, new_ts ) )
-        # compute the histogram for ts
-        h, bins = numpy.histogram( ts, bins=(ts.max()-ts.min())/nbins )
-        ax.bar( ts, width=10, bottom=old_ts )
-        ax2.bar( ts, width=10, bottom=old_ts )
-    
-       
+    # create two identical histograms 
+    n, bins, patches = ax.hist( ts, bins=int(len(ts)/10.),\
+                                normed=normed, facecolor=color,\
+                                alpha=0.75, histtype=histtype, log=log )
+    n, bins, patches = ax2.hist( ts, bins=int(len(ts)/10.),\
+                                 normed=normed, facecolor=color,\
+                                 alpha=0.75, histtype=histtype, log=log )
+
+    # make the inset
+    # options of loc: BEST, UR, UL, LL, LR, R, CL, CR, LC, UC, C = range(11)
+    #axins = zoomed_inset_axes(ax, 10, loc=10 ) # ( axes, zoom power, location )
+    axins = inset_axes( ax, width='70%', height=1., loc=10 )
+    axins.hist( ts, bins=int(len(ts)/10.),\
+                normed=normed, facecolor=color,\
+                alpha=0.75, histtype=histtype, log=log )
+
+    print "Done creating histograms. Took", time.time() - start, " seconds"
+    # set box position by hand
+
     # pos = [left, bottom, width, height]
     # axins.set_position
-        
+
     # hide spines between axes
     ax.spines['right'].set_visible(False)
     ax.xaxis.tick_bottom()
@@ -756,30 +668,183 @@ def plot_hist_stack( cells, color='blue',
     # arguments to pass plot, just so we don't keep repeating them
     # remember, plot takes list of x's, followed by list of y's
     kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-    ax.plot((1-d,1+d),(-d,+d), **kwargs)      # bottom-right diagonal
-    ax.plot((1-d,1+d),(1-d,1+d), **kwargs)    # top-right diagonal
+    ax.plot( (1-d,1+d),(-d,+d), **kwargs )      # bottom-right diagonal
+    ax.plot( (1-d,1+d),(1-d,1+d), **kwargs )    # top-right diagonal
 
     kwargs.update(transform=ax2.transAxes)  # switch to the right axes
     ax2.plot((-d,+d),(-d,+d), **kwargs)   # bottom-left diagonal
     ax2.plot((-d,+d),(1-d,1+d), **kwargs) # top-left diagonal
 
+    # vertical separator
+    ax2.set_ylabel( '---------- ---------- ---------- ---------- ----------', horizontalalignment='center' )
+
    # zoom-in / limit the view to different portions of the data
     ax.set_xlim( 0., left_xlim ) # most of the data
-    ax.set_ylim( 0., n.max()+5 )
-    ax2.set_xlim( right_xlim, ts.max()+5) # outliers/inf gens
-    ax2.set_ylim( 0., 60. )  # zoom in to see the inf gens
+    ax.set_ylim( 0., n.max() + 10 )
+    ax2.set_xlim( right_xlim, ts.max() + 0.01) # outliers/inf gens
+    ax2.set_ylim( 0., 0.001 * n.max() )  # zoom in to see the inf gens
 
     # sub region of the original image
     yscale = n.max() * (1./60)
-    xmax = 250.
-    x1, x2, y1, y2 = 25, xmax, 0, yscale
-    # axins.set_xlim(x1, x2)
-    # axins.set_ylim(y1, y2)
-    # axins.set_aspect( xmax/yscale )
-    # # draw a bbox of the region of the inset axes in the parent axes and
-    # # connecting lines between the bbox and the inset axes area
-    # mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+    # set the zom cutoff as a percentage of the max
+    xmax = cutoff * ts.max()
+    x1, x2, y1, y2 = 0.015, xmax, 0, yscale
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    axins.set_aspect( xmax/yscale )
+    axins.set_xticks([])
+    axins.set_yticks([])
+
+    # set some tick marks
+    left_ticks = numpy.arange( 0, left_xlim-0.01, 0.02 )
+    left_labels = [ str( x ) for x in left_ticks ]
+    ax.set_xticks( left_ticks )
+    ax.set_xticklabels( left_labels )
+    # scientific notation
+    ax.ticklabel_format( style='sci', scilimits=(0,0), axis='y' )
+    
+    # draw a bbox of the region of the inset axes in the parent axes and
+    # connecting lines between the bbox and the inset axes area
+    mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
     fig.subplots_adjust( wspace=0.1 )
     plt.show()
     
     return fig, ts
+
+def plot_hist_stack(  cells, color='blue',
+                      normed=False, fontsize=20,
+                      cell_type='New',
+                      show_plot=False, log=False,
+                      left_xlim=300, right_xlim=1600,
+                      cutoff=0.08, ts_max=100, histtype='stepfilled',
+                      rwidth=1, skip=1):
+    """
+    cells -- list of cells (full paths to) whose generator lifespans
+    we want to stack in a single histogram.
+
+    This is similar to the above, plot_hist_cut_axis(), except that it
+    stacks numerous histograms.
+    """
+    from mpl_toolkits.axes_grid.inset_locator import inset_axes, zoomed_inset_axes
+    from mpl_toolkits.axes_grid.inset_locator import mark_inset
+    import matplotlib.colors as colors
+
+
+    # create a color instance
+    rcolors = numpy.random.rand( (len(cells),3) )
+    cc = colors.ColorConverter()
+    cmap = [ cc.to_rgb( c ) for c in rcolors ]
+
+    # This method works with mpl 0.99 (plt.subplot() works with >1.1.0 )
+    fig = plt.figure( figsize=(6,4), dpi=160 )
+    ax = fig.add_subplot( 121 ) 
+    ax2 = fig.add_subplot( 122 )
+
+    # time shit
+    start = time.time()
+
+    # cell == cell directory containing persistence diagrams
+    all_ts = []
+    for c, cell in enumerate( cells ):
+        # list of lifespans for each frame in cell
+        # concatenate all of the diagrams for cell lifespans into one
+        # timeseries
+        ts = [ get_ts ( frame ) for frame in cell[:ts_max:skip] ]
+        ts = numpy.hstack( ts )
+        # convert and normalize, then append to the list of time series
+        ts = numpy.asarray( ts, dtype=numpy.float )
+        ts /= ts.max()
+        all_ts.append( ts )
+
+        print "Done creating time series. Took", time.time() - start, " seconds"
+
+    min_len = min( [ len( t ) for t in all_ts ] )
+    n, bins, patches = ax.hist( all_ts, bins=500,#min_len/float(2*ts_max),
+                                histtype='barstacked', rwidth=rwidth, color=cmap )
+    n, bins, patches = ax2.hist( all_ts, bins=500,#min_len/float(2*ts_max),
+                                 histtype='barstacked', rwidth=rwidth, color=cmap )
+    axins = inset_axes( ax, width='70%', height=1., loc=10 )
+    axins.hist( all_ts, bins=200, #min_len/float(2*ts_max),\
+                normed=normed,\
+                alpha=0.75, histtype='barstacked', log=log, rwidth=rwidth, color=norm )
+         
+    print "Done creating histograms. Took", time.time() - start, " seconds"
+       
+    # pos = [left, bottom, width, height]
+    # axins.set_position
+ 
+    # hide spines between axes
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.tick_bottom()
+    ax.yaxis.tick_left()
+    # the tail side
+    ax2.spines['left'].set_visible(False)
+    ax2.xaxis.tick_bottom()
+    ax2.yaxis.tick_right()
+    #ax2.set_yticks( [] )
+    #ax.tick_params(labeltop='off') # don't put tick labels at the top
+
+
+    d = .015 # how big to make the diagonal lines in axes coordinates
+    # arguments to pass plot, just so we don't keep repeating them
+    # remember, plot takes list of x's, followed by list of y's
+    kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
+    ax.plot( (1-d,1+d),(-d,+d), **kwargs )      # bottom-right diagonal
+    ax.plot( (1-d,1+d),(1-d,1+d), **kwargs )    # top-right diagonal
+
+    kwargs.update(transform=ax2.transAxes)  # switch to the right axes
+    ax2.plot((-d,+d),(-d,+d), **kwargs)   # bottom-left diagonal
+    ax2.plot((-d,+d),(1-d,1+d), **kwargs) # top-left diagonal
+
+    # vertical separator
+    ax2.set_ylabel( '---------- ---------- ---------- ---------- ----------', horizontalalignment='center' )
+
+    # zoom-in / limit the view to different portions of the data
+    # We key some of the the limits off the max over all time series
+    nx_max = max( [ x.max() for x in all_ts ] )
+    ny_max = max( [ y.max() for y in n ] )
+    
+    ax.set_xlim( 0., left_xlim ) # most of the data
+    ax.set_ylim( 0., ny_max + 10 )
+    ax2.set_xlim( right_xlim, nx_max + 0.01) # outliers/inf gens
+    ax2.set_ylim( 0., 0.001 * ny_max )  # zoom in to see the inf gens
+
+    # sub region of the original image
+    yscale = ny_max * (1./60)
+    # set the zom cutoff as a percentage of the max
+    xmax = cutoff * nx_max
+    x1, x2, y1, y2 = 0.015, xmax, 0, yscale
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    axins.set_aspect( xmax/yscale )
+    axins.set_xticks([])
+    axins.set_yticks([])
+
+    # set some tick marks
+    left_ticks = numpy.arange( 0, left_xlim-0.01, 0.02 )
+    left_labels = [ str( x ) for x in left_ticks ]
+    ax.set_xticks( left_ticks )
+    ax.set_xticklabels( left_labels )
+    ax.ticklabel_format( style='sci', scilimits=(0,0), axis='y' )
+    
+    # draw a bbox of the region of the inset axes in the parent axes and
+    # connecting lines between the bbox and the inset axes area
+    mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+    fig.subplots_adjust( wspace=0.1 )
+
+    plt.show()
+
+    return fig, all_ts
+
+
+if __name__ == "__main__":
+
+    prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
+    newlist = ['new_10', 'new_110125', 'new_130125', 'new_140125', 'new_3',
+               'new_4', 'new_40125', 'new_50125', 'new_6', 'new_60125', 'new_9']
+    oldlist = ['old_100125', 'old_120125', 'old_15', 'old_2', 'old_4000', 'old_4001',
+               'old_5',  'old_50125',  'old_6',  'old_7',  'old_8',  'old_9',  'old_90125']
+    cells = [ prefix + c + '/' for c in newlist ]
+    frames = [ dir_list( c ) for c in cells ]
+    plot_hist_stack( frames, left_xlim=0.2, right_xlim=0.6, normed=False,
+                     cutoff=0.1, ts_max=100, skip=10 )
