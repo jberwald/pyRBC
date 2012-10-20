@@ -47,8 +47,8 @@ def cell2npy( cell, bnd, rows=(203,198) ):
     """
     bnd_arr = numpy.loadtxt( bnd )
     frames = []
+    print "opening ", cell
     with open( cell, 'rU' ) as fh:
-        print "opened", cell
         fromstring = numpy.fromstring
         print "converting lines..."
         for line in fh.readlines():
@@ -134,7 +134,12 @@ def plot_frame_mask_zero( frame, nx=203, ny=198 ):
     Use pylab.imshow() to plot a frame. Mask the elements of the image
     matrix that are zero.
     """
-    frame.resize((nx,ny))
+    # This allows frame to be any data, such as a symmetric 2D
+    # Gaussian.
+    try:
+        frame.resize((nx,ny))
+    except:
+        pass
 
     cdict = {'red': ((0., 1, 1),
                      (0.05, 1, 1),
@@ -158,16 +163,19 @@ def plot_frame_mask_zero( frame, nx=203, ny=198 ):
 
     my_cmap = colors.LinearSegmentedColormap('my_colormap',cdict,256)
     fig = plt.figure( frameon=False, dpi=160 )
+    # for transparency
+    fig.patch.set_alpha( 0.0 )
     ax = fig.gca()
     ax.set_xticks( [] )
     ax.set_yticks( [] )
+    ax.set_axis_off() # turn off the axes 
     im = ax.imshow( frame, cmap=my_cmap )
     cbar = plt.colorbar( im, shrink=0.6 )
     fig.show()
     return fig
     
 def plot_sublevel_set( fname, height, bndfile=None, persfile=None,
-                       mask=False, nx=203, ny=198 ):
+                       mask=False, nx=203, ny=198, save=False, transparent=True ):
     """
     Plot sublevel set for a cell <fname> (full path to cell).
     """
@@ -178,41 +186,65 @@ def plot_sublevel_set( fname, height, bndfile=None, persfile=None,
     # numpy file
     except ValueError:
         data = numpy.load( fname )
-    print data.shape
+    print "data", data.shape
     if bndfile:
         bnd = numpy.loadtxt( bndfile )
-        print bnd.shape
-        data = bnd.ravel() * data
+        print "boundary", bnd.shape
+        try:
+            data = bnd.ravel() * data
+        except ValueError:
+            data = bnd * data
         data.resize( (nx,ny) )
 
-    # make an array to hold (R,G,B) data at each pixel
-    G = numpy.zeros((nx,ny,3), dtype=int)
+    # make an array to hold (R,G,B,A) data at each pixel
+    G = numpy.zeros((nx,ny,4), dtype=int)
 
     # make output directory
     outdir = slash.join( fname.split( '/' )[:-1] ) + '/'
     #temp = data.copy()
-    G[ numpy.where( data > int(h) ) ] = [1,1,1]
+    G[ numpy.where( data > int(h) ) ] = [1,1,1,0]
     if mask:
         print numpy.where( data <= int(h) )
         # the sublevel set
-        G[ numpy.where( data <= int(h) ) ] = [0,0,160]
+        G[ numpy.where( data <= int(h) ) ] = [0,0,160,1]
         # everything outside 
-        G[ numpy.where( data == 0 ) ] = [1,1,1]
+        G[ numpy.where( data == 0 ) ] = [1,1,1,0]
     # make output name here
     outName = fname.split('/')[-1][:-4] + '_' + str( h )
     output = outdir + outName
+    
     # now plot stuff
     fig = plt.figure( frameon=False )
+
+    # make things transparent?
+    if transparent:
+        fig.patch.set_alpha( 0. )
+
     ax = fig.gca()
     ax.set_frame_on( False )
     #ax.set_title('RBC ' + output)
+    # PLOT THE MATRIX OF VALUES
     ax.imshow( G )
     ax.set_xticks( [] )
     ax.set_yticks( [] )
     fig.show()
     #plt.colorbar()
-    print "saving images to", output
-    fig.savefig( output + '.png', dpi=160 )
-    fig.savefig( output + '.pdf', dpi=160 )
+    if save:
+        print "saving images to", output
+        fig.savefig( output + '.png', dpi=160 )
+        fig.savefig( output + '.pdf', dpi=160 )
     return G, fig
 
+def sublevel_sequence():
+    heights = [ 900,1050,1110 ]
+    frame = 'new11_frame2000.txt'
+    bnd = 'boundary_Nov_new110125'
+    figs = []
+    for h in heights:
+        figs.append( plot_sublevel_set( frame, h, bndfile=bnd, mask=True ) )
+    return figs
+
+
+if __name__ == "__main__":
+
+    pass

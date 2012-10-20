@@ -30,12 +30,75 @@ def get_gens_between (file, epsilon1, epsilon2):
     stringGens.remove('')
     gens = []
     #parse generators
-    [gens.append(map(int,sgen.split(' '))) for sgen in stringGens]
+    for sgen in stringGens:
+        gens.append(map(int,sgen.split(' ')))
     for (birth,death) in gens:
         if (death - birth) > epsilon1 and (death-birth) < epsilon2:
             goodGens.append((birth,death))
     return goodGens
 
+def get_gens_between_normed( fname, eps1, eps2 ):
+    """
+    """
+    with open( fname, 'r' ) as fh:
+        s = fh.read()
+    goodGens = []
+    #split up generators
+    stringGens = s.split('\n')
+    stringGens.remove('')
+    gens = []
+    
+    #parse generators
+    for sgen in stringGens:
+        gens.append(map(int,sgen.split(' ')))
+    gens = numpy.array( gens )
+    y1, y2 = normalize_mid_lifespan( gens, eps1, eps2 )
+        
+    # normalize the generator stack and the midrange band
+    gens = normalize( gens )
+    # now find the normalized midrange generators
+    for (birth,death) in gens:
+        if (death - birth) > y1 and (death-birth) < y2:
+            goodGens.append((birth,death))    
+    return goodGens
+
+def normalize_mid_lifespan( gens, eps0, eps1 ):
+    """
+    Normalize the midrange band. Basically, take
+
+    f: (eps0,eps1) --> [0,1].
+
+    Returns f(eps0,eps1) = (y0,y1)
+    """
+    eps0 = float( eps0 )
+    eps1 = float( eps1 )
+    delta = gens.max()
+    return eps0 / delta, eps1 / delta
+
+def normalize(arr, imin=0, imax=1, dmin=None, dmax=None):
+    """
+    Normalize our data, in-place. (stolen from stack
+    overload. surprised numpy doesn't have a built-in normalize
+    function.)
+
+    (imin, max) -- desired range of normalization
+
+    dmin and dmax -- used if the array does not include all of the
+    values. For instance, birth time may not include the minimum and
+    maximum values. In this case, 0 and max_height are passed to the
+    function.
+    """
+    arr = arr.astype( float )
+    if dmin is None:
+        dmin = 0 #arr.min()
+    if dmax is None:
+        dmax = arr.max()
+    arr -= dmin
+    arr *= (imax - imin)
+    arr /= (dmax - dmin)
+    arr += imin
+    return arr
+    
 def get_mean_sigma ( file ):
     """
         Function to get mean and standard deviation
@@ -80,8 +143,9 @@ def get_midrange_ts( fdir, lb, betti=1, sname=None ):
     dlist = os.listdir( fdir )
     diag_list = []
     # find all diagram files in <fdir> for <betti>
+    suffix = '_' + str( betti ) + '.txt'
     for f in dlist:
-        if f.endswith( '_'+str( betti )+'.txt'):
+        if f.endswith( suffix ):
             diag_list.append( f )
             fname = fdir + f
     diag_list.sort( key=natural_key )
@@ -91,13 +155,11 @@ def get_midrange_ts( fdir, lb, betti=1, sname=None ):
         # account for the one infinite generator
         num_gens.append( len(get_ts( fdir + d, lb=lb ))-1 )
         midrange_gens.append( get_ts( fdir + d, lb=lb )[:-1] )
-    genarr = numpy.array( midrange_gens, dtype=numpy.int )
-    ng
+    genarr = midrange_gens #numpy.array( midrange_gens, dtype=numpy.int )
     if sname:
         numpy.savetxt( sname, genarr )
     else:
         return genarr
-    
 
 def get_gens ( file, rmv='',data = ''):
     """
@@ -293,7 +355,10 @@ def get_Max ( fname, add=1 ):
         Send in add=k to return max height value + k
         For example, setting add=1 works when H_1 
         """
-    return numpy.load(fname).max()+add
+    try:
+        return numpy.load(fname).max()+add
+    except IOError:
+        return int( numpy.loadtxt(fname).max() + add )
 
 def get_Max_Block ( fname, ind, add=1 ):
     """
@@ -443,32 +508,6 @@ def plot_sgen ( b_num ):
         y . append (numList[-1])
     plt.scatter(x,y)
     plt.show()
-    
-def plot_hist( fname, color='blue', normed=False, fontsize=20 ):
-    """
-    Plot a histogram of generator lifespan along the diagonal.
-
-    fname -- full path to perseus output file.
-    """
-    ts = get_ts ( fname )
-    # the (almost) infinite generator overwhelms the plot
-    ts = ts[:-1]
-    fig = plt.figure()
-    ax = fig.gca()
-    # the histogram of the data
-    n, bins, patches = ax.hist( ts, bins=ts.max()-ts.min(),
-                                normed=normed, facecolor=color, alpha=0.75)
-    xticks = [ int( tk ) for tk in ax.get_xticks() ]
-    yticks = [ int( tk ) for tk in ax.get_yticks() ]
-    ax.set_xticklabels( xticks, fontsize=fontsize )
-    ax.set_yticklabels( yticks, fontsize=fontsize )
-
-    #ax.set_title( r'Distribution of generator lifespans along diagonal' )
-    ax.set_xlabel( r"Lifespan (death-birth)", fontsize=fontsize )
-    ax.set_ylabel( r"Number of generators ($\beta_1$)", fontsize=fontsize )
-    ax.grid( True )
-    plt.show()
-    return fig
 
 def dir_list( fdir, betti=1 ):
     """
@@ -479,372 +518,30 @@ def dir_list( fdir, betti=1 ):
     theFiles.sort( key=natural_key )
     return theFiles
 
-def plot_hist_colors( cell, color='blue',
-                      normed=False, fontsize=20,
-                      threshold=50, cell_type='New',
-                      show_plot=False, log=True):
-    """
-    Plot a histogram of generator lifespan along the diagonal. This
-    allows more control over bin color.
-
-    cell -- full path to perseus output file.
-    """
-    from matplotlib.ticker import ScalarFormatter
-
-    fig = plt.figure( dpi=80)
-    ax = fig.gca()
-
-    # cell is a list of frames
-    if hasattr( cell, 'pop' ):
-        # create an array with first entry in cell, then extend in
-        # loop
-        ts = get_ts ( cell[0] )
-        #ts = ts[:-1]
-        for f in cell[1:]:
-            new_ts = get_ts ( f )
-            # the (almost) infinite generator overwhelms the plot
-            #new_ts = new_ts[:-1]
-            # extend last ts of generators by new_ts
-            ts = numpy.hstack( ( ts, new_ts ) )
-            # the histogram of the data
-            #vals = vals[1:]
-        # create two identical histograms 
-        n, bins, patches = ax.hist( ts, bins=(ts.max()-ts.min()),\
-                                    normed=normed, facecolor=color,\
-                                    alpha=0.75, histtype='bar', log=log )
-    # or cell is just a single frame
-    else:
-        ts = get_ts ( cell )
-        # the (almost) infinite generator overwhelms the plot
-        ts = ts[:-1]
-        # the histogram of the data
-        n, bins, patches = ax.hist( ts, bins=ts.max()-ts.min(),\
-                                    normed=normed, facecolor=color,\
-                                    alpha=0.75 )#  histtype='step')
-
-# # we need to normalize the data to 0..1 for the full
-# # range of the colormap
-# fracs = N.astype(float)/N.max()
-# norm = colors.normalize(fracs.min(), fracs.max())
-
-    theColors = [ 'b', 'r' ]
-    for num_gens, patch in zip( bins[:-1], patches ):
-        if num_gens > threshold:
-            color = theColors[ 1 ]
-            # patch.set_width( 1.0 )
-        else:
-            color = theColors[ 0 ]
-            #patch.set_width( 1.0 )
-        patch.set_facecolor( color )
-    # set some axis attributes
-    xticks = [ int( tk ) for tk in ax.get_xticks() ]
-    yticks = [ int( tk ) for tk in ax.get_yticks() ]
-    ax.set_xticklabels( xticks, fontsize=fontsize )
-    ax.set_yticklabels( yticks, fontsize=fontsize )
-
-    #ax.set_title( r''+str( cell_type ) + ' cell', fontsize=24 )
-    ax.set_xlabel( r"Lifespan (death-birth)", fontsize=fontsize )
-    ax.set_ylabel( r"$\beta_1$", fontsize=fontsize )
-    #ax.ticklabel_format( style='sci', axis='y' )  # scientific notation
-
-    sf = ScalarFormatter()
-    sf.set_scientific( True )
-
-    ax.grid( True )
-    if show_plot:
-        plt.show()
-    return fig, ts
-
-
-def plot_midrange_ts( new_file, old_file, skip=10, fontsize=20, lines=None ):
-    """
-    Plots two times series of midrange generators.
-    """
-    ts_new = numpy.loadtxt( new_file )
-    ts_old = numpy.loadtxt( old_file )
-
-    fig = plt.figure( dpi=160, figsize=([10,4]) )
-    ax = fig.gca()
-    ax.plot( ts_new[::10], 'b-', linewidth=2 )
-    ax.plot( ts_old[::10], 'r-', linewidth=2 )
-    # plot vertical lines to point out location of sublevel sets in ts
-    if lines:
-        vmin, vmax = ax.get_ylim()
-        smidge = 0.1
-        print vmin, vmax
-        for line in lines:
-            v = int( line/float(skip) )
-            ax.vlines( v, vmin+smidge, vmax, linestyle='dashed', linewidth=2 )
-
-
-    # set some axis attributes; account for skip when setting tick marks
-    xticks = [ skip*int( tk ) for tk in ax.get_xticks() ]
-    yticks = [ int( tk ) for tk in ax.get_yticks() ]
-    ax.set_xticklabels( xticks, fontsize=fontsize )
-    ax.set_yticklabels( yticks, fontsize=fontsize )
-    ax.set_xlabel( r"time", fontsize=fontsize )
-    ax.set_ylabel( r"# of midrange generators", fontsize=fontsize )
-    fig.show()
-    return fig
-
-def plot_hist_cut_axis( cell, color='blue',
-                        normed=False, fontsize=20,
-                        cell_type='New',
-                        show_plot=False, log=False,
-                        left_xlim=300, right_xlim=1600,
-                        cutoff=0.08, ts_max=100, histtype='stepfilled' ):
-    """
-    Plot a histogram of generator lifespans computed as distance from diagonal.
-
-    cell -- full path to perseus output file.
-    """
-    from mpl_toolkits.axes_grid.inset_locator import inset_axes, zoomed_inset_axes
-    from mpl_toolkits.axes_grid.inset_locator import mark_inset
-
-    # timing
-    start = time.time()
-    
-    # cell is a list of frames
-    # create an array with first entry in cell, then extend in
-    # loop
-    ts = [ get_ts( cell[0] ) ]
-    #    ts = ts[:-1]
-    for f in cell[1:ts_max]:
-        ts.append( get_ts( f ) )
-        #new_ts = get_ts ( f )
-        # the (almost) infinite generator overwhelms the plot
-        #      new_ts = new_ts[:-1]
-        # extend last ts of generators by new_ts
-        #ts = numpy.hstack( ( ts, new_ts ) )
-        # the histogram of the data
-        #vals = vals[1:]
-    # convert and normalize
-    ts = numpy.hstack( ts )
-    ts = numpy.asarray( ts, dtype=numpy.float )
-    ts /= ts.max()
- 
-    print "Done creating time series. Took", time.time() - start, " seconds"
-
-    # This method works with mpl 0.99 ( plt.subplot() works with >1.1.0 )
-    fig = plt.figure( dpi=160 )
-    ax = fig.add_subplot( 121 ) 
-    ax2 = fig.add_subplot( 122 )
-
-    # create two identical histograms 
-    n, bins, patches = ax.hist( ts, bins=int(len(ts)/10.),\
-                                normed=normed, facecolor=color,\
-                                alpha=0.75, histtype=histtype, log=log )
-    n, bins, patches = ax2.hist( ts, bins=int(len(ts)/10.),\
-                                 normed=normed, facecolor=color,\
-                                 alpha=0.75, histtype=histtype, log=log )
-
-    # make the inset
-    # options of loc: BEST, UR, UL, LL, LR, R, CL, CR, LC, UC, C = range(11)
-    #axins = zoomed_inset_axes(ax, 10, loc=10 ) # ( axes, zoom power, location )
-    axins = inset_axes( ax, width='70%', height=1., loc=10 )
-    axins.hist( ts, bins=int(len(ts)/10.),\
-                normed=normed, facecolor=color,\
-                alpha=0.75, histtype=histtype, log=log )
-
-    print "Done creating histograms. Took", time.time() - start, " seconds"
-    # set box position by hand
-
-    # pos = [left, bottom, width, height]
-    # axins.set_position
-
-    # hide spines between axes
-    ax.spines['right'].set_visible(False)
-    ax.xaxis.tick_bottom()
-    ax.yaxis.tick_left()
-    # the tail side
-    ax2.spines['left'].set_visible(False)
-    ax2.xaxis.tick_bottom()
-    ax2.yaxis.tick_right()
-    #ax2.set_yticks( [] )
-    #ax.tick_params(labeltop='off') # don't put tick labels at the top
-
-
-    d = .015 # how big to make the diagonal lines in axes coordinates
-    # arguments to pass plot, just so we don't keep repeating them
-    # remember, plot takes list of x's, followed by list of y's
-    kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-    ax.plot( (1-d,1+d),(-d,+d), **kwargs )      # bottom-right diagonal
-    ax.plot( (1-d,1+d),(1-d,1+d), **kwargs )    # top-right diagonal
-
-    kwargs.update(transform=ax2.transAxes)  # switch to the right axes
-    ax2.plot((-d,+d),(-d,+d), **kwargs)   # bottom-left diagonal
-    ax2.plot((-d,+d),(1-d,1+d), **kwargs) # top-left diagonal
-
-    # vertical separator
-    ax2.set_ylabel( '---------- ---------- ---------- ---------- ----------', horizontalalignment='center' )
-
-   # zoom-in / limit the view to different portions of the data
-    ax.set_xlim( 0., left_xlim ) # most of the data
-    ax.set_ylim( 0., n.max() + 10 )
-    ax2.set_xlim( right_xlim, ts.max() + 0.01) # outliers/inf gens
-    ax2.set_ylim( 0., 0.001 * n.max() )  # zoom in to see the inf gens
-
-    # sub region of the original image
-    yscale = n.max() * (1./60)
-    # set the zom cutoff as a percentage of the max
-    xmax = cutoff * ts.max()
-    x1, x2, y1, y2 = 0.015, xmax, 0, yscale
-    axins.set_xlim(x1, x2)
-    axins.set_ylim(y1, y2)
-    axins.set_aspect( xmax/yscale )
-    axins.set_xticks([])
-    axins.set_yticks([])
-
-    # set some tick marks
-    left_ticks = numpy.arange( 0, left_xlim-0.01, 0.02 )
-    left_labels = [ str( x ) for x in left_ticks ]
-    ax.set_xticks( left_ticks )
-    ax.set_xticklabels( left_labels )
-    # scientific notation
-    ax.ticklabel_format( style='sci', scilimits=(0,0), axis='y' )
-    
-    # draw a bbox of the region of the inset axes in the parent axes and
-    # connecting lines between the bbox and the inset axes area
-    mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
-    fig.subplots_adjust( wspace=0.1 )
-    plt.show()
-    
-    return fig, ts
-
-def plot_hist_stack(  cells, color='blue',
-                      normed=False, fontsize=20,
-                      cell_type='New',
-                      show_plot=False, log=False,
-                      left_xlim=300, right_xlim=1600,
-                      cutoff=0.08, ts_max=100, histtype='stepfilled',
-                      rwidth=1, skip=1):
-    """
-    cells -- list of cells (full paths to) whose generator lifespans
-    we want to stack in a single histogram.
-
-    This is similar to the above, plot_hist_cut_axis(), except that it
-    stacks numerous histograms.
-    """
-    from mpl_toolkits.axes_grid.inset_locator import inset_axes, zoomed_inset_axes
-    from mpl_toolkits.axes_grid.inset_locator import mark_inset
-    import matplotlib.colors as colors
-
-
-    # create a color instance
-    rcolors = numpy.random.rand( (len(cells),3) )
-    cc = colors.ColorConverter()
-    cmap = [ cc.to_rgb( c ) for c in rcolors ]
-
-    # This method works with mpl 0.99 (plt.subplot() works with >1.1.0 )
-    fig = plt.figure( figsize=(6,4), dpi=160 )
-    ax = fig.add_subplot( 121 ) 
-    ax2 = fig.add_subplot( 122 )
-
-    # time shit
-    start = time.time()
-
-    # cell == cell directory containing persistence diagrams
-    all_ts = []
-    for c, cell in enumerate( cells ):
-        # list of lifespans for each frame in cell
-        # concatenate all of the diagrams for cell lifespans into one
-        # timeseries
-        ts = [ get_ts ( frame ) for frame in cell[:ts_max:skip] ]
-        ts = numpy.hstack( ts )
-        # convert and normalize, then append to the list of time series
-        ts = numpy.asarray( ts, dtype=numpy.float )
-        ts /= ts.max()
-        all_ts.append( ts )
-
-        print "Done creating time series. Took", time.time() - start, " seconds"
-
-    min_len = min( [ len( t ) for t in all_ts ] )
-    n, bins, patches = ax.hist( all_ts, bins=500,#min_len/float(2*ts_max),
-                                histtype='barstacked', rwidth=rwidth, color=cmap )
-    n, bins, patches = ax2.hist( all_ts, bins=500,#min_len/float(2*ts_max),
-                                 histtype='barstacked', rwidth=rwidth, color=cmap )
-    axins = inset_axes( ax, width='70%', height=1., loc=10 )
-    axins.hist( all_ts, bins=200, #min_len/float(2*ts_max),\
-                normed=normed,\
-                alpha=0.75, histtype='barstacked', log=log, rwidth=rwidth, color=norm )
-         
-    print "Done creating histograms. Took", time.time() - start, " seconds"
-       
-    # pos = [left, bottom, width, height]
-    # axins.set_position
- 
-    # hide spines between axes
-    ax.spines['right'].set_visible(False)
-    ax.xaxis.tick_bottom()
-    ax.yaxis.tick_left()
-    # the tail side
-    ax2.spines['left'].set_visible(False)
-    ax2.xaxis.tick_bottom()
-    ax2.yaxis.tick_right()
-    #ax2.set_yticks( [] )
-    #ax.tick_params(labeltop='off') # don't put tick labels at the top
-
-
-    d = .015 # how big to make the diagonal lines in axes coordinates
-    # arguments to pass plot, just so we don't keep repeating them
-    # remember, plot takes list of x's, followed by list of y's
-    kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-    ax.plot( (1-d,1+d),(-d,+d), **kwargs )      # bottom-right diagonal
-    ax.plot( (1-d,1+d),(1-d,1+d), **kwargs )    # top-right diagonal
-
-    kwargs.update(transform=ax2.transAxes)  # switch to the right axes
-    ax2.plot((-d,+d),(-d,+d), **kwargs)   # bottom-left diagonal
-    ax2.plot((-d,+d),(1-d,1+d), **kwargs) # top-left diagonal
-
-    # vertical separator
-    ax2.set_ylabel( '---------- ---------- ---------- ---------- ----------', horizontalalignment='center' )
-
-    # zoom-in / limit the view to different portions of the data
-    # We key some of the the limits off the max over all time series
-    nx_max = max( [ x.max() for x in all_ts ] )
-    ny_max = max( [ y.max() for y in n ] )
-    
-    ax.set_xlim( 0., left_xlim ) # most of the data
-    ax.set_ylim( 0., ny_max + 10 )
-    ax2.set_xlim( right_xlim, nx_max + 0.01) # outliers/inf gens
-    ax2.set_ylim( 0., 0.001 * ny_max )  # zoom in to see the inf gens
-
-    # sub region of the original image
-    yscale = ny_max * (1./60)
-    # set the zom cutoff as a percentage of the max
-    xmax = cutoff * nx_max
-    x1, x2, y1, y2 = 0.015, xmax, 0, yscale
-    axins.set_xlim(x1, x2)
-    axins.set_ylim(y1, y2)
-    axins.set_aspect( xmax/yscale )
-    axins.set_xticks([])
-    axins.set_yticks([])
-
-    # set some tick marks
-    left_ticks = numpy.arange( 0, left_xlim-0.01, 0.02 )
-    left_labels = [ str( x ) for x in left_ticks ]
-    ax.set_xticks( left_ticks )
-    ax.set_xticklabels( left_labels )
-    ax.ticklabel_format( style='sci', scilimits=(0,0), axis='y' )
-    
-    # draw a bbox of the region of the inset axes in the parent axes and
-    # connecting lines between the bbox and the inset axes area
-    mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
-    fig.subplots_adjust( wspace=0.1 )
-
-    plt.show()
-
-    return fig, all_ts
-
 
 if __name__ == "__main__":
 
-    prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
+    #prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
+    prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/Old/'
     newlist = ['new_10', 'new_110125', 'new_130125', 'new_140125', 'new_3',
                'new_4', 'new_40125', 'new_50125', 'new_6', 'new_60125', 'new_9']
     oldlist = ['old_100125', 'old_120125', 'old_15', 'old_2', 'old_4000', 'old_4001',
                'old_5',  'old_50125',  'old_6',  'old_7',  'old_8',  'old_9',  'old_90125']
-    cells = [ prefix + c + '/' for c in newlist ]
+    #cells = [ prefix + c + '/' for c in newlist ]
+    cells = [ prefix + c + '/' for c in oldlist ]
     frames = [ dir_list( c ) for c in cells ]
-    plot_hist_stack( frames, left_xlim=0.2, right_xlim=0.6, normed=False,
-                     cutoff=0.1, ts_max=100, skip=10 )
+    # fig, ts = plot_hist_stack( frames, left_xlim=0.2, right_xlim=0.6, normed=False,
+    #                            cutoff=0.2, ts_max=1000, skip=20, log=True )
+
+    # lower bound
+    lb = 40
+    ts = {}
+    for cell_dir in cells:
+        print "Getting midrange gens for ", cell_dir
+        ts[ cell_dir ] = get_midrange_ts( cell_dir, lb )
+    with open( 'data/old_midrange_ts.pkl', 'w' ) as fh:
+        pkl.dump( ts, fh )
+
+    # plot_hist_cut_axis( frames, normed=False, log=True,
+    #                     left_xlim=0.2, right_xlim=0.6,
+    #                     cutoff=0.2, ts_max=1000, skip=20 )

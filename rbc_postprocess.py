@@ -82,6 +82,11 @@ def plot_diagram_std (persFile, fontsize=20):
     ax.scatter( x, y,c='b',marker='o',lw=.1)
     line = [0, int(maxLevel)]
     ax.plot(line, line, 'g-')
+
+    # set yaxis lims
+    ax.set_xlim( [0, max( line )] )
+    ax.set_ylim( [0, max( y )+10] )
+    
     fig.show()
     return fig
 
@@ -91,7 +96,7 @@ def plot_diagram_regions( persFile, lines=[], fontsize=20, zoom=False ):
 
     lines  -- list of ints indicating region-separating h/vlines.
 
-    ** NOTE ** The plot attricbutes are specifically for cell new11.
+    ** NOTE ** The plot attributes are specifically for cell new11.
     """
     with open(persFile, 'r') as fh:
         s = fh.read()
@@ -119,8 +124,8 @@ def plot_diagram_regions( persFile, lines=[], fontsize=20, zoom=False ):
         xticks = [0,500,1000,1500,2000,2500] 
         yticks = [0,500,1000,1500,2000,2500]
     else:
-        xticks = [0,500,1000,1500,2000,2500] + lines
-        yticks = [0,500,1000,1500,2000,2500] + lines
+        xticks = [0,500,1500,2000,2500] + lines
+        yticks = [0,500,1500,2000,2500] + lines
     xticks.sort()
     yticks.sort()
     xticks_str = [ str( t ) for t in xticks ]
@@ -145,3 +150,5 @@ def plot_diagram_regions( persFile, lines=[], fontsize=20, zoom=False ):
     #ax.set_ylabel( 'death', fontsize=fontsize )
     fig.show()
     return fig
+
+    

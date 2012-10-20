@@ -24,7 +24,7 @@ def noisy_gaussian(height, center_x, center_y, width_x, width_y, noise_level, sh
     return lambda x,y: height*exp(
         -(((center_x-x)/width_x)**2 + ((center_y-y)/width_y)**2)/2) + noise_level*random.random( shape )
        
-def plot_gaussian( size_x, size_y, height, width=20,
+def plot_gaussian( size_x=201, size_y=201, height=100, width=20,
                    noise_level=None, bowl=False,
                    fname=None, show_fig=False ):
     """
@@ -62,13 +62,16 @@ def plot_gaussian( size_x, size_y, height, width=20,
         fig = figure()
         ax = fig.gca()
         ax.matshow( data )
+        return data, fig
     if fname:
         fig.savefig( "./figures/"+fname )
-    return data
+        return data, fig
+    else:
+        return data
 
 def sublevel( data, height ):
     """
-    Plot sublevel sets.
+    Plot sublevel sets. Specify colors so that background is white or transparent.
     """
     h = height
     nx, ny = data.shape
@@ -92,7 +95,7 @@ def sublevel( data, height ):
 
 def multi_gaussian():
     """
-    Just a utility function.
+    Just a utility function. Requires Sage.
 
     Sage 3d commands:
 
@@ -102,7 +105,7 @@ def multi_gaussian():
     sage: q = plot3d( lambda x,y: G[x,y], (x,0,200), (y,0,200), adaptive=True, color=cmsel)
     sage: q.show( spect_ratio=(1,1,1), figsize=[7,3], frame=False )
     """
-    nx = ny = 401
+    nx = ny = 801
     fat = plot_gaussian( nx, ny, 1.5, width=40)
     flip = plot_gaussian( nx, ny, -1.3, width=20)
     tall = plot_gaussian( nx, ny, 1, width=7)
@@ -111,6 +114,7 @@ def multi_gaussian():
 
 def plot_gauss_trough( level=7430 ):
     """
+    For use with sage.
     """
     G = multi_gaussian()
     #G = G / 4.
@@ -132,7 +136,7 @@ def plot_gauss_trough( level=7430 ):
     C = clip_sublevel( G, level )
     R = plot3d( lambda x,y: C[x,y], (x,0,nx-1), (y,0,ny-1), adaptive=True, color='blue', alpha=0.5)
     
-    R.show( spect_ratio=(1,1,1), figsize=[7,3], frame=True )
+    R.show( aspect_ratio=(1,1,1), figsize=[7,3], frame=True )
 
     return G
 
@@ -147,3 +151,26 @@ def clip_sublevel( G, level ):
     return C
   
     
+def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70):
+    """
+    Plot a gaussian with a small subpeak and a single pixel ("noise") raised.
+    """
+    nx = ny = 201
+    Xin, Yin = mgrid[0:size_x, 0:size_y]
+
+    # the big bump
+    big_h = 10
+    big_w = 40
+    big = gaussian(big_h, nx, ny, big_w, big_w)(Xin, Yin)
+
+    # the subpeak
+    small_h = 6
+    small_w = 20
+    snx = nx + shift_x
+    sny = ny + shift_y
+    small = gaussian(small_h, snx, sny, small_w, small_w)(Xin, Yin)
+
+    # add pixelated noise at a single point near the peak of 'big'
+    big[ nx-35, ny-35 ] += 1   
+    
+    return big + small
