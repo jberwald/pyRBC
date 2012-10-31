@@ -1,3 +1,4 @@
+from numpy import random as rand
 from numpy import *
 import matplotlib.pyplot as plt
 from pylab import figure, matshow, show, imshow
@@ -22,7 +23,7 @@ def noisy_gaussian(height, center_x, center_y, width_x, width_y, noise_level, sh
     width_x = float(width_x)
     width_y = float(width_y)
     return lambda x,y: height*exp(
-        -(((center_x-x)/width_x)**2 + ((center_y-y)/width_y)**2)/2) + noise_level*random.random( shape )
+        -(((center_x-x)/width_x)**2 + ((center_y-y)/width_y)**2)/2) + noise_level*rand.random( shape )
        
 def plot_gaussian( size_x=201, size_y=201, height=100, width=20,
                    noise_level=None, bowl=False,
@@ -149,28 +150,42 @@ def clip_sublevel( G, level ):
     idx = where( G > level )
     C[ idx ] = level
     return C
-  
+
+def clip_base( G, lb ):
+    """
+    Replace all values in G < lb with 0.
+    """
+    w = where( G < lb )
+    G[ w ] = 0
+    return G
+    #return G[ w ] = 0
     
-def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70):
+def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
     """
     Plot a gaussian with a small subpeak and a single pixel ("noise") raised.
+
+    Argument <noise> takes a float for the amplitude of the additive white noise (mean 0).
     """
     nx = ny = 201
     Xin, Yin = mgrid[0:size_x, 0:size_y]
 
     # the big bump
-    big_h = 10
+    big_h = 20
     big_w = 40
-    big = gaussian(big_h, nx, ny, big_w, big_w)(Xin, Yin)
+    if not noise:
+        big = gaussian(big_h, nx, ny, big_w, big_w)(Xin, Yin)
+    else:
+        big = noisy_gaussian(big_h, nx, ny, big_w, big_w, noise, shape=Xin.shape)(Xin, Yin)
 
     # the subpeak
-    small_h = 6
+    small_h = 11
     small_w = 20
     snx = nx + shift_x
     sny = ny + shift_y
     small = gaussian(small_h, snx, sny, small_w, small_w)(Xin, Yin)
 
     # add pixelated noise at a single point near the peak of 'big'
-    big[ nx-35, ny-35 ] += 1   
-    
+    if not noise:
+        big[ nx-16, ny+8 ] += 1.0
+             
     return big + small

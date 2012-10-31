@@ -56,18 +56,24 @@ def write_file ( fname, output ):
                 text . write (str(int(data[i][j])) + "\n")
     text . close()
 
-def write_sparse_file ( fname, output):
+def write_sparse_file ( fname, output=None ):
     """
-        - Write sparse
-        See above arguments
+    fname -- filename without extension. Extension must be .txt or .npy.
+
+    output -- name of output file. If None, '_pers' is apended to fname, yielding <fname>_pers.txt.
+    
+        - Write sparse See above arguments
         """
     #dimension array
     numDim = 2
     #Open file
+    if output == None:
+        output = fname + '_pers'
     text = open (output + ".txt", "w")
     #Write number of dimensions
     text . write (str(numDim) + "\n")
-    #Write strictly 2D file
+
+    # now open the array file
     if fname.endswith( 'npy' ):
         data = numpy.load(fname)
     else:

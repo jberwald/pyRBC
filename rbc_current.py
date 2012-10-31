@@ -37,7 +37,7 @@ def get_gens_between (file, epsilon1, epsilon2):
             goodGens.append((birth,death))
     return goodGens
 
-def get_gens_between_normed( fname, eps1, eps2 ):
+def get_gens_between_normed( fname, eps1, eps2, means=False ):
     """
     """
     with open( fname, 'r' ) as fh:
@@ -59,8 +59,15 @@ def get_gens_between_normed( fname, eps1, eps2 ):
     # now find the normalized midrange generators
     for (birth,death) in gens:
         if (death - birth) > y1 and (death-birth) < y2:
-            goodGens.append((birth,death))    
-    return goodGens
+            goodGens.append((birth,death))
+    if means:
+        if goodGens:
+            ga = numpy.asarray( goodGens, dtype=int )
+            return ga.mean(), ga.std()
+        else:
+            return None
+    else:
+        return goodGens
 
 def normalize_mid_lifespan( gens, eps0, eps1 ):
     """
@@ -84,7 +91,7 @@ def normalize(arr, imin=0, imax=1, dmin=None, dmax=None):
     (imin, max) -- desired range of normalization
 
     dmin and dmax -- used if the array does not include all of the
-    values. For instance, birth time may not include the minimum and
+    values. For example, birth time may not include the minimum and
     maximum values. In this case, 0 and max_height are passed to the
     function.
     """
@@ -99,11 +106,11 @@ def normalize(arr, imin=0, imax=1, dmin=None, dmax=None):
     arr += imin
     return arr
     
-def get_mean_sigma ( file ):
+def get_mean_sigma ( fname ):
     """
         Function to get mean and standard deviation
     """
-    tsArr = get_ts ( file )
+    tsArr = get_ts ( fname )
     mean = tsArr.mean()
     std = tsArr.std()
     return (mean, std)
@@ -127,7 +134,6 @@ def get_ts ( file, data='', lb=0, ub=None ):
     ts = [(death-birth) for (birth,death) in gens
           if (death-birth) > lb and death < ub]
     tsArr = numpy.array(ts)
-    #return ts #return list
     return tsArr
 
 def get_midrange_ts( fdir, lb, betti=1, sname=None ):
@@ -156,6 +162,9 @@ def get_midrange_ts( fdir, lb, betti=1, sname=None ):
         num_gens.append( len(get_ts( fdir + d, lb=lb ))-1 )
         midrange_gens.append( get_ts( fdir + d, lb=lb )[:-1] )
     genarr = midrange_gens #numpy.array( midrange_gens, dtype=numpy.int )
+    if mean:
+        genarr = numpy.asarray( midrange_gens, dtype=numpy.int )
+        return genarr.mean(), genarr.std()
     if sname:
         numpy.savetxt( sname, genarr )
     else:

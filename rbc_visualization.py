@@ -20,17 +20,20 @@ import os
 import cPickle as pkl
 import rbc_processing as rp
 
-def plot_frame( frame ):
+def plot_frame( frame, outname=None ):
     """
         Use pylab.imshow() to plot a frame (npy array). 
         Note: The boundary should be removed, thus there will not be a halo
         """
     data = numpy.load(frame)
     fig = plt.figure()
-    plt.title("RBC frame")
+    #plt.title("RBC frame")
     plt.imshow(data)
     plt.colorbar()
-    plt.show()
+    #plt.show()
+    if outname:
+        fig.savefig( outname ) 
+
 
 def plot_block_frame( frame, ind ):
     """

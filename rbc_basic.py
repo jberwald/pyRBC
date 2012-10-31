@@ -25,13 +25,14 @@ removed.)
 """
 
 import numpy
-#from pylab import *
 import re
+#import matplotlib
+#matplotlib.use( 'Agg' )
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
-import rbc_processing as rp
-import sys
+#import rbc_processing as rp
+import sys, os
 
 slash = '/'
 
@@ -80,7 +81,7 @@ def load_rbc( fname, skiprows, nx, ny ):
     cell_frames = [ C[i].reshape(( nx,ny )) for i in range( 5000-skiprows ) ]
     return cell_frames
 
-def extract_frames( fname, bnd ):
+def extract_frames( fname, bnd, to_png=True, save_prefix='/data/jberwald/old_png/old12' ):
     """
     Each line of the cell in <fname> contains a raveled matrix. Read
     each line of <fname>, reshape it based on array stored in <bnd>
@@ -103,19 +104,30 @@ def extract_frames( fname, bnd ):
     subfolder = cell_name.partition( '-' )[0]
     savedir = part[0] + '/' + 'frames/' + subfolder +'/'
 
-    make_dir( savedir )
+    # make_dir( savedir )
     # print 'savedir', savedir
      
     # loop over lines in <fname> and save each as nx x ny array
-    #k = 0. 
+    #k = 0.
+    # ma
+    if to_png:
+        fig = plt.figure()
     fromstring = numpy.fromstring
     for k, line in enumerate( fh.readlines() ):
         arr = fromstring( line, sep='\t' )
         # remove boundary 
-        arr = bnd_arr * arr
+        #arr = bnd_arr * arr
         arr.resize( (nx,ny) )
+        if to_png:
+            ax = fig.gca()
+            im = ax.imshow( arr )
+            fig.savefig( save_prefix + 'noBND_' + str( k ) + '.png' )
+            fig.clf()
+        if k==10:
+            return
         #numpy.save( savedir + cell_name + '_' + str(k), arr )
-        savefunc( savedir + cell_name + '_' + str(k), arr )
+        #savefunc( savedir + cell_name + '_' + str(k), arr )
+
 
 def plot_frame( frame ):
     """
@@ -135,7 +147,7 @@ def plot_frame_mask_zero( frame, nx=203, ny=198 ):
     matrix that are zero.
     """
     # This allows frame to be any data, such as a symmetric 2D
-    # Gaussian.
+    # Gaussian. 
     try:
         frame.resize((nx,ny))
     except:
@@ -174,19 +186,32 @@ def plot_frame_mask_zero( frame, nx=203, ny=198 ):
     fig.show()
     return fig
     
-def plot_sublevel_set( fname, height, bndfile=None, persfile=None,
-                       mask=False, nx=203, ny=198, save=False, transparent=True ):
+def plot_sublevel_set( frame, height, bndfile=None, persfile=None,
+                       nx=203, ny=198, save=False,
+                       transparent=True, thresh=None ):
     """
-    Plot sublevel set for a cell <fname> (full path to cell).
+    Plot sublevel set for an array representing an intensity function.
+
+    frame -- path to array on disk or Numpy array.
+
+    height -- function height at which to take sublevel set.
     """
     h = height
     # text file
     try:
-        data = numpy.loadtxt( fname )
-    # numpy file
-    except ValueError:
-        data = numpy.load( fname )
+        try:
+            data = numpy.loadtxt( frame )
+            # numpy file
+        except ValueError:
+            data = numpy.load( frame )
+    except:
+        # This is for a general array that is already rectangular
+        # and needs no help.
+        data = frame
+        nx,ny = data.shape
+
     print "data", data.shape
+    # if we read in a data file we might need a boundary file to go with it.
     if bndfile:
         bnd = numpy.loadtxt( bndfile )
         print "boundary", bnd.shape
@@ -199,37 +224,43 @@ def plot_sublevel_set( fname, height, bndfile=None, persfile=None,
     # make an array to hold (R,G,B,A) data at each pixel
     G = numpy.zeros((nx,ny,4), dtype=int)
 
-    # make output directory
-    outdir = slash.join( fname.split( '/' )[:-1] ) + '/'
+    # if not thresh:
+    #     thresh = 0.9
+    
     #temp = data.copy()
     G[ numpy.where( data > int(h) ) ] = [1,1,1,0]
-    if mask:
-        print numpy.where( data <= int(h) )
-        # the sublevel set
-        G[ numpy.where( data <= int(h) ) ] = [0,0,160,1]
-        # everything outside 
-        G[ numpy.where( data == 0 ) ] = [1,1,1,0]
-    # make output name here
-    outName = fname.split('/')[-1][:-4] + '_' + str( h )
-    output = outdir + outName
-    
+    # the sublevel set
+    G[ numpy.where( data <= int(h) ) ] = [0,0,160,1]
+    # everything outside 
+    G[ numpy.where( data == 0.0 ) ] = [1,1,1,0]
+    # outside majority of Gaussian peak
+    if thresh:
+        G[ numpy.where( data <= thresh ) ] = [1,1,1,0]
+   
     # now plot stuff
     fig = plt.figure( frameon=False )
 
     # make things transparent?
     if transparent:
-        fig.patch.set_alpha( 0. )
+        fig.patch.set_alpha( 0.0 )
 
     ax = fig.gca()
     ax.set_frame_on( False )
     #ax.set_title('RBC ' + output)
     # PLOT THE MATRIX OF VALUES
+    print "plotting sublevel set..."
     ax.imshow( G )
     ax.set_xticks( [] )
     ax.set_yticks( [] )
     fig.show()
     #plt.colorbar()
     if save:
+        if type( frame ) == str:
+            # make output directory
+            outdir = slash.join( frame.split( '/' )[:-1] ) + '/'
+            outName = fname.split('/')[-1][:-4] + '_' + str( h )
+            output = outdir + outName
+    
         print "saving images to", output
         fig.savefig( output + '.png', dpi=160 )
         fig.savefig( output + '.pdf', dpi=160 )

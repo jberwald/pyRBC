@@ -89,7 +89,7 @@ def get_birth_times( cell, eps1, eps2=150, normed=True ):
     (So [eps1,eps2], stretched along the diagonal, is the band that we
     store generators from.)
 
-    For each frame in cell_dir: find generator lifespans.  Find first
+    For each frame in cell==cell_dir: find generator lifespans.  Find first
     occurence, \tau, of a midrange generator ( use get_gens_between()
     for this, then peel off the birth time from the first
     (birth,death) pair to get birth time) store \tau.
@@ -109,6 +109,41 @@ def get_birth_times( cell, eps1, eps2=150, normed=True ):
             continue
         birth_times.append( gens[0][0] )
     return birth_times
+
+
+def get_mean_midrange( cell, eps1, eps2=150, normed=True):
+    """
+    cell -- path to directory containing Perseus generator
+    file (one for each frame).
+
+    eps1 -- minimum lifespan
+
+    eps2 -- maximum lifespan
+
+    (So [eps1,eps2], stretched along the diagonal, is the band that we
+    store generators from.)
+
+    For each frame in cell==cell_dir: find generator lifespans.  Find first
+    occurence, \tau, of a midrange generator ( use get_gens_between()
+    for this, then peel off the birth time from the first
+    (birth,death) pair to get birth time) store \tau.
+
+    NOTE: Depending on eps1, very rarely a list of gens will be
+    empty. We treat this as missing data and continue to loop over the
+    frames.
+    """
+    frames = dir_list( cell )
+    gen_stats = []
+    for frame in frames:
+        # get the midrange gen stats for frame (normed or not)
+        if normed:
+            gstats = get_gens_between_normed( frame, eps1, eps2, means=True )
+        else:
+            gstats = get_gens_between( frame, eps1, eps2, means=True )
+        if not gstats:
+            continue
+        gen_stats.append( gens )
+    return gen_stats
 
 def plot_boxplot( data, vert=1, pa=True, transparent=True ):
     """
@@ -239,13 +274,13 @@ def plot_hist_birth_times( bt_old=None, bt_new=None,
     return fig, new, old
 
 
-def plot_hist_all( ts, nbins=50, transparent=True, **kwargs ):
+def plot_hist_all( ts, nbins=50, transparent=True, norm_it=False, **kwargs ):
     """
-    
-    
     ts -- dictionary with values as lifespan timeseries.
 
     kwargs -- see pylab hist() function
+
+    Returns interpolation functions as well as histogram triple and figure instance.
     """
     from pylab import log1p
     from matplotlib.mlab import stineman_interp
@@ -283,15 +318,15 @@ def plot_hist_all( ts, nbins=50, transparent=True, **kwargs ):
     upper = avg + err
     lower = avg - err
 
-    print "yhist", yhist
-    print "avg", avg
-    print ""
+    # print "yhist", yhist
+    # print "avg", avg
+    # print ""
 
-    print err
-    print ""
-    print lower
-    print upper
-    print ""
+    # print err
+    # print ""
+    # print lower
+    # print upper
+    # print ""
 
     # average value for each histogram bin
     for i, x in enumerate( avg ):
@@ -331,7 +366,80 @@ def plot_hist_all( ts, nbins=50, transparent=True, **kwargs ):
     #                   color='r', alpha=0.5, zorder=10 )
     fig.show()
 
-    return xi, lower_yi, upper_yi, fig
+    if norm_it:
+        y_max = masked_yi.max()
+        print "y_max", y_max
+        masked_yi /= y_max
+
+    return xi, masked_yi, lower_yi, upper_yi, fig, (n, bins, patches)
+
+def plot_hist_figure( ts, persfile=None, single=0, norm_it=True, nbins=100 ):
+    """
+    Plot the histogram figure for the RBC paper.
+
+    ts -- List of arrays of times series of generator lifespans for
+    each cell.
+
+    persfile -- full path to persistence file
+
+    single -- Cell to choose from list to compute histogram statistics
+    on. Should be the same cell used in <persfile>.
+
+    norm_it -- Toggle whether to return a normalized histogram.
+    """
+    # compute stats for all cells
+    out_all = plot_hist_all( ts, norm_it=norm_it )
+    allx = out_all[0]
+    ally = out_all[1]
+
+    # compute stats for chosen single cell
+    out = plot_hist_all( [ts[single]], norm_it=norm_it )
+    nx = out[0]
+    ny = out[1]
+
+    # now normalize everything by dividing by total area ( y --> PDF )
+    pdf_ally = pdf( allx, ally )
+    pdf_ny = pdf( nx, ny )
+
+
+    print "pdf_ally", ((nx[1:]-nx[:-1]) * pdf_ally[:-1]).sum()
+    print "pdf_ny", ((nx[1:]-nx[:-1]) *pdf_ny[:-1]).sum()
+
+    fig = plt.figure()
+    ax = fig.gca()
+    #    ax.set_xscale( 'log' )
+    ax.set_yscale( 'log' )
+    #ax.set_aspect( 1 )
+ 
+    ax.plot( nx, pdf_ally, lw=3, c='b', label='Mean, all cells' )
+    ax.plot( nx, pdf_ny, lw=3, c='r', label='Mean, single cell' )
+
+    # add a histogram for a single frame
+    if persfile:
+        ts = numpy.asarray( get_ts( persfile ), dtype=numpy.int )
+        n, bins = numpy.histogram( ts, bins=len(nx)-1, range=(nx.min(),nx.max()) )
+        ts_pdf = pdf( bins[:-1], n )
+
+        print "ts_pdf", ((bins[1:] - bins[:-1])*ts_pdf).sum()
+        width = nx[1]-nx[0]
+        ax.bar( bins[:-1], ts_pdf, width=width, color='g', alpha=0.7, label='Single frame distribution' )
+        #ax.plot( bins[:-1], ts_pdf, marker='o', ms=6, lw=3, label='Single frame' )
+    plt.legend()
+    fig.show()
+    return fig, bins, ts_pdf  #, n, bins
+
+def pdf( xi, yi ):
+    """
+    Normalize f(x) = y in terms of probability distribution
+    functions. Thus, it should return f such that 
+
+    \int_{min(xi)}^{max(xi)} {f(x_i)*(x_{i+1}-x_{i})   = 1
+    """
+    dx = xi[1:] - xi[:-1]
+    integ = numpy.sum( yi[:-1] * dx )
+    thepdf = yi/integ
+    return thepdf
+
 
 def concat_timeseries( cells, ts_max=-1, skip=1, normed=False ):
     """
@@ -903,7 +1011,7 @@ def load_all_bt( prefix='' ):
 
 if __name__ == "__main__":
 
-    if 0:
+    if 1:
         prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
         #prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/Old/'
         newlist = ['new_10' , 'new_110125', 'new_130125', 'new_140125', 'new_3',
@@ -920,15 +1028,15 @@ if __name__ == "__main__":
         #ts = concat_timeseries( dc, ts_max=-1, skip=10 )
 
         # find thresholds where first generators above lifespan <eps> are born
-        # bt = []
-        # for eps in [30, 40]:
-        #     print "eps = ", eps
-        #     print ""
-        #     for cell in cells:
-        #         bt.append( get_birth_times( cell, eps ) )
-        #     # save to disk!
-        #     with open( './data/bt_new_normed_eps'+str(eps)+'.pkl', 'w' ) as fh:
-        #         pkl.dump( bt, fh )
+        bt = []
+        for eps in [30, 40]:
+            print "eps = ", eps
+            print ""
+            for cell in cells:
+                bt.append( get_birth_times( cell, eps ) )
+            # save to disk!
+            with open( './data/bt_new_normed_eps'+str(eps)+'.pkl', 'w' ) as fh:
+                pkl.dump( bt, fh )
     
     #fig = plot_scatter( ts, log=True )
     
