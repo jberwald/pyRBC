@@ -40,30 +40,32 @@ def get_gens_between (file, epsilon1, epsilon2):
 def get_gens_between_normed( fname, eps1, eps2, means=False ):
     """
     """
-    with open( fname, 'r' ) as fh:
-        s = fh.read()
-    goodGens = []
-    #split up generators
-    stringGens = s.split('\n')
-    stringGens.remove('')
-    gens = []
+    # with open( fname, 'r' ) as fh:
+    #     s = fh.read()
+    # goodGens = []
+    # #split up generators
+    # stringGens = s.split('\n')
+    # stringGens.remove('')
+    # gens = []
     
-    #parse generators
-    for sgen in stringGens:
-        gens.append(map(int,sgen.split(' ')))
-    gens = numpy.array( gens )
+    # #parse generators
+    # for sgen in stringGens:
+    #     gens.append(map(int,sgen.split(' ')))
+    # gens = numpy.array( gens )
+
+    gens = numpy.loadtxt( fname )
     y1, y2 = normalize_mid_lifespan( gens, eps1, eps2 )
         
     # normalize the generator stack and the midrange band
     gens = normalize( gens )
-    # now find the normalized midrange generators
+    goodGens = []
+    # now find the normalized midrange generators birth and death time
     for (birth,death) in gens:
         if (death - birth) > y1 and (death-birth) < y2:
             goodGens.append((birth,death))
     if means:
         if goodGens:
-            ga = numpy.asarray( goodGens, dtype=int )
-            return ga.mean(), ga.std()
+            return numpy.asarray( goodGens )
         else:
             return None
     else:
@@ -78,9 +80,13 @@ def normalize_mid_lifespan( gens, eps0, eps1 ):
     Returns f(eps0,eps1) = (y0,y1)
     """
     eps0 = float( eps0 )
-    eps1 = float( eps1 )
+    if eps1 == -1:
+        eps1 = float( gens.max() )
+    else:
+        eps1 = float( eps1 )
     delta = gens.max()
     return eps0 / delta, eps1 / delta
+
 
 def normalize(arr, imin=0, imax=1, dmin=None, dmax=None):
     """
@@ -136,7 +142,7 @@ def get_ts ( file, data='', lb=0, ub=None ):
     tsArr = numpy.array(ts)
     return tsArr
 
-def get_midrange_ts( fdir, lb, betti=1, sname=None ):
+def get_midrange_ts( fdir, lb, betti=1, sname=None, mean=False, infinite=False ):
     """
     fdir -- directory containing persistence diagrams
 
@@ -157,10 +163,16 @@ def get_midrange_ts( fdir, lb, betti=1, sname=None ):
     diag_list.sort( key=natural_key )
     midrange_gens = []
     num_gens = []
-    for d in diag_list:
-        # account for the one infinite generator
-        num_gens.append( len(get_ts( fdir + d, lb=lb ))-1 )
-        midrange_gens.append( get_ts( fdir + d, lb=lb )[:-1] )
+    if infinite:
+        for d in diag_list:
+            # account for the one infinite generator
+            num_gens.append( len(get_ts( fdir + d, lb=lb ))-1 )
+            midrange_gens.append( get_ts( fdir + d, lb=lb )[:-1] )
+    # just truncate the noisy generators, leaving the 'infinite' ones in the list
+    else:
+        for d in diag_list:
+            num_gens.append( len(get_ts( fdir + d, lb=lb )) )
+            midrange_gens.append( get_ts( fdir + d, lb=lb ) )
     genarr = midrange_gens #numpy.array( midrange_gens, dtype=numpy.int )
     if mean:
         genarr = numpy.asarray( midrange_gens, dtype=numpy.int )
@@ -543,13 +555,23 @@ if __name__ == "__main__":
     #                            cutoff=0.2, ts_max=1000, skip=20, log=True )
 
     # lower bound
-    lb = 40
-    ts = {}
-    for cell_dir in cells:
-        print "Getting midrange gens for ", cell_dir
-        ts[ cell_dir ] = get_midrange_ts( cell_dir, lb )
-    with open( 'data/old_midrange_ts.pkl', 'w' ) as fh:
-        pkl.dump( ts, fh )
+    lb = [55, 60]
+    old_ts = {}
+    for x in lb:
+        for cell_dir in cells:
+            print "Getting midrange gens for ", cell_dir
+            old_ts[ cell_dir ] = get_midrange_ts( cell_dir, x )
+        with open( './timeseries/old_gen_ts_lb'+str(x)+'.pkl', 'w' ) as fh:
+            pkl.dump( old_ts, fh )
+
+    # lb = [60, 73]
+    # new_ts = {}
+    # for x in lb:
+    #     for cell_dir in cells:
+    #         print "Getting midrange gens for ", cell_dir
+    #         new_ts[ cell_dir ] = get_midrange_ts( cell_dir, x )
+    #     with open( './timeseries/new_gen_ts_lb'+str(x)+'.pkl', 'w' ) as fh:
+    #         pkl.dump( new_ts, fh )
 
     # plot_hist_cut_axis( frames, normed=False, log=True,
     #                     left_xlim=0.2, right_xlim=0.6,

@@ -23,7 +23,8 @@ def noisy_gaussian(height, center_x, center_y, width_x, width_y, noise_level, sh
     width_x = float(width_x)
     width_y = float(width_y)
     return lambda x,y: height*exp(
-        -(((center_x-x)/width_x)**2 + ((center_y-y)/width_y)**2)/2) + noise_level*rand.random( shape )
+        -(((center_x-x)/width_x)**2 + ((center_y-y)/width_y)**2)/2) +\
+        noise_level*rand.normal( size=shape )
        
 def plot_gaussian( size_x=201, size_y=201, height=100, width=20,
                    noise_level=None, bowl=False,
@@ -151,20 +152,20 @@ def clip_sublevel( G, level ):
     C[ idx ] = level
     return C
 
-def clip_base( G, lb ):
+def clip_below( G, lb ):
     """
     Replace all values in G < lb with 0.
     """
     w = where( G < lb )
     G[ w ] = 0
-    return G
+    #return G
     #return G[ w ] = 0
     
 def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
     """
     Plot a gaussian with a small subpeak and a single pixel ("noise") raised.
 
-    Argument <noise> takes a float for the amplitude of the additive white noise (mean 0).
+    Argument <noise> takes a float for the amplitude of the additive gaussian noise (mean 0).
     """
     nx = ny = 201
     Xin, Yin = mgrid[0:size_x, 0:size_y]
@@ -186,6 +187,98 @@ def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
 
     # add pixelated noise at a single point near the peak of 'big'
     if not noise:
+        big[ nx-15, ny+8 ] += 1.0
+        big[ nx-15, ny+9 ] += 1.0
         big[ nx-16, ny+8 ] += 1.0
+        big[ nx-16, ny+9 ] += 1.0
+        big[ nx-14, ny+8 ] += 1.0
+        big[ nx-14, ny+9 ] += 1.0
+        # big[ nx-16, ny+8 ] += 1.0
+        # big[ nx-16, ny+9 ] += 1.0
              
     return big + small
+
+
+######
+##  convenience functions
+######
+
+def create_persfile( noise=None,
+                     smooth_data='/Users/jberwald/github/local/caja-matematica/pyRBC/data/gauss_peak/gauss_peak.npy' ):
+    """
+    Convenience function. Sample usage:
+
+    import gaussian as G
+    noise = linspace( 0.01, 0.1, 10 )
+    for x in noise:
+        G.create_persfile( noise=x )
+
+    Saves the perseus-readable (sparse cubical format) to disk (see
+    below).
+    """
+    from pyRBC import rbc_npy2Perseus as rp
+
+    # grab the original file
+    A = gauss_bump( noise=noise )
+
+    # find where to clip the noisy surface 
+    B = load( smooth_data )
+    clip_below( B, 1 ) # in-place, set elements to zero
+    w = where( B == 0 )
+    A[w] = 0 # now both smooth on noisy surfaces are clipped to zero
+             # outside the same boundary.
+    
+    # scale for additional resolution
+    A *= 100
+
+    # might as well save the file for posterity
+    noise_level = str( noise )
+    # remove the decimal (split on '.', then join the list with '.' removed)
+    noise_level = ''.join( noise_level.split( '.' ) )
+    sname = './data/gauss_peak/Gnoise/gauss_Gnoise'+noise_level
+
+    # clip the zeros to force a white background in figures
+    print "Saving ", sname
+    save( sname+'.npy', A )
+    rp.write_sparse_file( sname+'.npy',
+                          sname+'_pers' )
+
+    
+def run_perseus( ):
+    """
+    Convenience function
+    """
+    from pyRBC import rbc_perseus as pers
+
+    levels = linspace(0.01,0.1,10)
+
+    persname = '/Users/jberwald/github/local/caja-matematica/pyRBC/data/gauss_peak/Gnoise/gauss_Gnoise'
+    for x in levels:
+        noise_level = str( x )
+        # remove the decimal (split on '.', then join the list with '.' removed)
+        noise_level = ''.join( noise_level.split( '.' ) )
+        
+        fname = persname + noise_level + '_pers.txt'
+        outname = persname + noise_level
+        print fname
+        print outname
+        print ""
+
+        pers.perseus( 'scubtop', fname, outname )
+
+def make_figures():
+    """
+    """
+    from pyRBC import rbc_postprocess as rpost
+    levels = linspace(0.01,0.1,10)
+
+    persname = '/Users/jberwald/github/local/caja-matematica/pyRBC/data/gauss_peak/Gnoise/gauss_Gnoise'
+    for x in levels:
+        noise_level = str( x )
+        # remove the decimal (split on '.', then join the list with '.' removed)
+        noise_level = ''.join( noise_level.split( '.' ) )
+        fname = persname + noise_level + '_1.txt'
+            
+        fig = rpost.plot_diagram_std( fname, scale=100, show_fig=False )
+        fig.savefig( persname + noise_level + '_dia.png', dpi=200 )
+    

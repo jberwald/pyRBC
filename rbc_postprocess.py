@@ -59,57 +59,54 @@ def plot_diagram (persFile, lb=0, ub=2, out_type='bin',rmv='Y', dpi=80, fontsize
     fig.show()
     return fig
 
-def plot_diagram_std (persFile, fontsize=20, scale=None):
+def plot_diagram_std (persFile, fontsize=20, scale=None, show_fig=True):
     """
+    persFile -- path to <perseus output>_*.txt, where * is the dimension.
+
+    scale -- Factor to scale the birth/death times. 
     """
-    # load text file
-    # with open(persFile, 'r') as fh:
-    #     s = fh.read()
-    # s = s.split('\n')#seperate gens
-    # s.remove('') #remove blank lines
-
-    s = numpy.loadtxt( persFile, dtype=numpy.int, delimiter=' ' )
-    w = numpy.where( s == -1 )
-
     if scale:
-        s = numpy.asarray( s, dtype=numpy.float )
+        # cast values as floats for division
+        s = numpy.loadtxt( persFile, dtype=numpy.float, delimiter=' ' )
         s /= scale
-    s[ w ] = s.max()
+    else:
+        s = numpy.loadtxt( persFile, dtype=numpy.int, delimiter=' ' )
+    births = s[:,0]
+    deaths = s[:,1]
 
-    nx = s[:,0]
-    ny = s[:,1]
+    # max death time
+    maxd = deaths.max()
     
-    # for i, g in enumerate( s ):
-    #     birth,death = g.split(' ')
-    #     # can this happen??
-    #     if int(birth) == -1:
-    #         birth = maxLevel
-    #     if int(death) == -1:
-    #         death = maxLevel
-    #     x.append( int(birth) )
-    #     if death==0:
-    #         print "death at i=", i
-    #     y.append( int(death) )
-    # now make the figure
+    print "Max death time ",  maxd
+
+    # non-infinite gens
+    normal_idx = numpy.where( deaths != -1 )[0]
+
     fig = plt.figure( ) #dpi=160 )
     fig.patch.set_alpha( 0.0 )
     ax = fig.gca()
-    #ax.plot( x, y, 'bo', ms=4 )
 
-    ax.scatter( nx, ny,c='b',marker='o',lw=.1)
+    ax.plot( births[normal_idx], deaths[normal_idx], 'bo' )
 
     # create diagonal
-    line = [0, s.max()+10]
-    ax.plot(line, line, 'g-')
+    diag = [0, maxd+2]
+    ax.plot(diag, diag, 'g-')
 
-    # set yaxis lims
-    ax.set_xlim( [0, max( line )+10] )
-    ax.set_ylim( [0, max( ny )+10] )
-    
-    fig.show()
+    # infinite gens
+    inf_idx = numpy.where( deaths == -1 )[0]
+    inf_vec = (maxd + 1) * numpy.ones( len( inf_idx ) )
+
+    # plot 'em
+    ax.plot( births[inf_idx], inf_vec, 'ro' )
+
+    # fix the left x-axis boundary at 0
+    ax.set_xlim( left=0 )
+    if show_fig:
+        fig.show()
+    print "Total number of persistence intervals", len( births ) # total number of persistence intervals
     return fig
 
-def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=None ):
+def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=None, gauss=False ):
     """
     persFile -- path to perseus persistence diagram text file
 
@@ -126,6 +123,7 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
     # y = []
     s = numpy.loadtxt( persFile, dtype=numpy.float, delimiter=' ' )
     maxLevel = s.max()
+    # locate the infinite generators
     w = numpy.where( s == -1 )
     if scale:
         s = numpy.asarray( s, dtype=numpy.float )
@@ -134,7 +132,6 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
 
     nx = s[:,0]
     ny = s[:,1]
-    
     
     # for i in xrange(len(s)):
     #     birth,death = s[i].split(' ')
@@ -148,9 +145,9 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
     fig = plt.figure()# dpi=160, frameon=False )
     ax = fig.gca()
     ax.scatter( nx, ny,c='b',marker='o',lw=.1)
-    line = [0, maxLevel]
-    ax.plot(line, line, 'g-')
-    if lines:
+    diag = [0, maxLevel]
+    ax.plot( diag, diag, 'g-')
+    if not gauss:
         xticks = [0,500,1800] +lines
         yticks = [0,500,1800] +lines
         # xticks = [0,500,1000,1500,2000,2500] 
@@ -158,7 +155,7 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
     else:
         ## THESE WEIRD VALUES ARE FOR A GAUSSIAN WITH NOISE AND SUBPEAK
         xticks = [0,5,10,15,20] + lines
-        xticks.pop( xticks.index(19) )
+        #xticks.pop( xticks.index(19) )
         yticks = [0,5,10,15, 20] + lines
         # xticks = [0,500,1500,2000,2500] + lines
         # yticks = [0,500,1500,2000,2500] + lines
@@ -173,12 +170,13 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
     if lines:
         for line in lines:
             ax.hlines( line, 0, line, linestyles='dashed' ) ## jjb ***** this is _specifically_ for new11, frame 2000
-            ax.vlines( line, line, s.max(), linestyles='dashed' )
+            ax.vlines( line, line, s.max()+1, linestyles='dashed' )
     if zoom:
         ax.set_xlim( (lines[0]-200, lines[1]+200) )
         ax.set_ylim( (lines[0]-200, lines[1]+200) )
         ax.set_autoscale_on( False )
     else:
+        print max(nx)
         ax.set_xlim( [0, max( nx )+1] )
         ax.set_ylim( [0, max( ny )+1] )
     #ax.set_title( 'Persistence Diagram', fontsize=fontsize+4 )

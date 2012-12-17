@@ -22,7 +22,7 @@ def perseus ( type, fname, output ):
         TYPE is input to perseus ex, cubtop, scubtop, etc
         run perseus
     """
-    call(['/home/kellys/Persistence/Perseus/perseus', type, fname, output])
+    call(['/usr/bin/perseus', type, fname, output])
 
 def run_perseus_All ( type, dir, output):
     """

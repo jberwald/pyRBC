@@ -18,6 +18,8 @@ import matplotlib.pylab as plt
 import re
 import os
 import pickle as pkl
+from scipy.spatial import distance
+
 
 def write_file ( fname, output ):
     """ 
@@ -124,6 +126,47 @@ def write_double_file ( fname, output ):
             else:
                 text . write (str(data[i][j]) + "\n")
     text . close()
+
+def write_distance_mat( data, output=None, g=0.1, stepsize=0.2,
+                        nsteps=10, dcap=None, metric='euclidean' ):
+    """
+    For use with
+
+    perseus distmat <path to distance matrix file> <output string>
+    """
+    # load from file if data is not an array of points
+    if not hasattr( data, '__index__' ):
+        # .npy or .txt
+        try:
+            data = numpy.load( data )
+        except IOError:
+            data = numpy.loadtxt( data )
+    dist = distance.pdist( data, metric=metric )
+    if output:
+        dist = distance.squareform( dist )
+        space = " "
+        # num points x dimension
+        nx, ny = data.shape
+        if not dcap:
+            dcap = ny
+        if not output.endswith( 'txt' ):
+            output += '.txt'
+        with open( output, 'w' ) as fh:
+            # nx x nx distance matrix
+            fh.write( str( nx )+'\n' )
+            # initial threshold, step size, num steps, dimension cap==ny
+            params = [ str( g ), str( stepsize ), str( nsteps ), str( dcap ) ]
+            params = space.join( params )
+            params += '\n'
+            fh.write( params )
+            for row in dist:
+                r = [ str( x ) for x in row ]
+                r = space.join( r )
+                r += '\n'
+                fh.write( r )
+        return dist
+    else:
+        return distance.squareform( dist )
 
 def plot_frame( frame ):
     """

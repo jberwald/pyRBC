@@ -111,7 +111,7 @@ def get_birth_times( cell, eps1, eps2=150, normed=True ):
     return birth_times
 
 
-def get_mean_midrange( cell, eps1, eps2=150, normed=True):
+def get_midrange_gens( cell, eps1, eps2=350, normed=False):
     """
     cell -- path to directory containing Perseus generator
     file (one for each frame).
@@ -139,10 +139,10 @@ def get_mean_midrange( cell, eps1, eps2=150, normed=True):
         if normed:
             gstats = get_gens_between_normed( frame, eps1, eps2, means=True )
         else:
-            gstats = get_gens_between( frame, eps1, eps2, means=True )
-        if not gstats:
-            continue
-        gen_stats.append( gens )
+            gstats = get_gens_between( frame, eps1, eps2 )
+        # if not gstats:
+        #     continue
+        gen_stats.append( gstats )
     return gen_stats
 
 def plot_boxplot( data, vert=1, pa=True, transparent=True ):
@@ -200,6 +200,7 @@ def boxplotter( fname='/Users/jberwald/github/local/caja-matematica/pyRBC/data/l
 
 
 def plot_hist_birth_times( bt_old=None, bt_new=None,
+                           stacked=None,
                            normalize=False, bins=50,
                            transparent=True, **kwargs ):
     """
@@ -215,25 +216,31 @@ def plot_hist_birth_times( bt_old=None, bt_new=None,
     if transparent:
         fig.patch.set_alpha( 0.0 )
     ax = fig.gca()
-    if bt_old:
+    if bt_old is not None:
         # concatenate data
-        old = numpy.hstack( bt_old )
+        if not hasattr( bt_old, "mean" ):
+            old = numpy.hstack( bt_old )
+        else:
+            old = bt_old
         oldhist, bins, patches = ax.hist( old, bins=bins, hatch='//',
-                                          color='r', alpha=0.75, )
+                                          color='r', alpha=0.75 )
         mean_old = old.mean()
         std_old = old.std()
         ax.axvline( mean_old, 
                     color='k', linestyle='dashed', lw=1.5 )
         ax.axvspan( mean_old - std_old,
-                    mean_old + std_old, facecolor='r', alpha=0.3)
+                    mean_old + std_old, facecolor='r', alpha=0.3 )
             # add an arrow -- NOT WORKING YET
         patches = []
         arrow = mpatches.ArrowStyle( "Fancy, head_length=.4, head_width=.4, tail_width=.4") 
         patches.append(arrow)
         # plt.text(pos[0,5], pos[1,5]-0.15, "Arrow", ha="center",
         #          family=font, size=14)
-    if bt_new:
-        new = numpy.hstack( bt_new )
+    if bt_new is not None:
+        if not hasattr( bt_new, "mean" ):
+            new = numpy.hstack( bt_new )
+        else:
+            new = bt_new
         newhist, bins, patches = ax.hist( new, bins=bins,
                                           color='b', alpha=0.75 )
         mean_new = new.mean()
@@ -241,23 +248,24 @@ def plot_hist_birth_times( bt_old=None, bt_new=None,
         ax.axvline( mean_new,
                     color='k', linestyle='dashed', lw=1.5 )
         ax.axvspan( mean_new - std_new,
-                    mean_new + std_new, facecolor='b', alpha=0.3)
-
-    if not bt_old and not bt_new:
-        print "Must provide at least one set of birth times."
-        return None
-    ax.set_xlabel( r'$\tau$ (normalized)', fontsize=24 )
-    ax.set_ylabel( 'Number of frames', fontsize=24 )
+                    mean_new + std_new, facecolor='b', alpha=0.3 )
+    else:
+        # this logic isn't right for the if-else block. 
+        if not bt_old and not bt_new:
+            print "Must provide at least one set of birth times."
+            return None
+    ax.set_xlabel( r'$\tau$ (normalized)', fontsize=16 )
+    ax.set_ylabel( 'Number of frames', fontsize=16 )
     xticks = ax.get_xticks()
     yticks = ax.get_yticks()
-    ax.set_xticklabels( [str( x ) for x in xticks], fontsize=20 )
+    ax.set_xticklabels( [str( x ) for x in xticks], fontsize=14 )
     ylabels = []
     for y in yticks:
         if y!=0:
             ylabels.append( str( int(y) ) )
         else:
             ylabels.append( ' ' ) # empty 0 on y axis
-    ax.set_yticklabels( ylabels, fontsize=20 )
+    ax.set_yticklabels( ylabels, fontsize=14 )
     # ax.set_yticklabels( [str( int(y) ) for y in yticks
     #                      if y!=0 else ], fontsize=20 )
 
@@ -273,6 +281,26 @@ def plot_hist_birth_times( bt_old=None, bt_new=None,
     fig.show()
     return fig, new, old
 
+
+def plot_simple_hist( ts, nbins=1000, color='b' ):
+    """
+    ts -- single time series of values to bin.
+
+    nbins -- number of bins to use
+
+    Returns Figure object.
+    """
+    fig = plt.figure( figsize=(12,8) )
+    fig.patch.set_alpha( 0.0 )
+    ax = fig.gca()
+    n, bins, patches = ax.hist( ts, bins=nbins, color=color, log=True,
+                                edgecolor='none' )
+    ax.set_xlabel( 'Lifespan', fontsize=20 )
+    ax.set_ylabel( 'Number of generators', fontsize=20 )
+    ax.set_ylim( bottom=0.5 ) 
+
+    return fig
+    
 
 def plot_hist_all( ts, nbins=50, transparent=True, norm_it=False, **kwargs ):
     """
@@ -373,20 +401,37 @@ def plot_hist_all( ts, nbins=50, transparent=True, norm_it=False, **kwargs ):
 
     return xi, masked_yi, lower_yi, upper_yi, fig, (n, bins, patches)
 
-def plot_hist_figure( ts, persfile=None, single=0, norm_it=True, nbins=100 ):
+def plot_hist_figure( ts, persfile=None, single=1, norm_it=True, nbins=100, new=True, vline=None ):
     """
     Plot the histogram figure for the RBC paper.
 
     ts -- List of arrays of times series of generator lifespans for
     each cell.
 
-    persfile -- full path to persistence file
+    persfile -- full path to a single persistence file (i.e. fsingle frame of single cell)
 
     single -- Cell to choose from list to compute histogram statistics
-    on. Should be the same cell used in <persfile>.
+    on. Should be the same cell used in <persfile>. (Default=1,
+    corresponds to new11 in ordered list (see below)).
 
     norm_it -- Toggle whether to return a normalized histogram.
+
+    new -- New or Old cells.
+
+    Note: Values used in RBC paper:
+
+    new_hist_ts.pkl
+    old_hist_ts.pkl
+    
+    new_110125-concatenated-ASCII_2000_1.txt
+    old_120125-concatenated-ASCII_2000_1.txt
     """
+    if new:
+        color = 'blue'
+        ctype = 'new'
+    else:
+        color = 'red'
+        ctype = 'old'
     # compute stats for all cells
     out_all = plot_hist_all( ts, norm_it=norm_it )
     allx = out_all[0]
@@ -401,9 +446,9 @@ def plot_hist_figure( ts, persfile=None, single=0, norm_it=True, nbins=100 ):
     pdf_ally = pdf( allx, ally )
     pdf_ny = pdf( nx, ny )
 
-
-    print "pdf_ally", ((nx[1:]-nx[:-1]) * pdf_ally[:-1]).sum()
-    print "pdf_ny", ((nx[1:]-nx[:-1]) *pdf_ny[:-1]).sum()
+    # output some stats 
+    print "\int { pdf_ally } = ", ((nx[1:]-nx[:-1]) * pdf_ally[:-1]).sum()
+    print "\int { pdf_ny } = ", ((nx[1:]-nx[:-1]) *pdf_ny[:-1]).sum()
 
     fig = plt.figure()
     ax = fig.gca()
@@ -411,19 +456,25 @@ def plot_hist_figure( ts, persfile=None, single=0, norm_it=True, nbins=100 ):
     ax.set_yscale( 'log' )
     #ax.set_aspect( 1 )
  
-    ax.plot( nx, pdf_ally, lw=3, c='b', label='Mean, all cells' )
-    ax.plot( nx, pdf_ny, lw=3, c='r', label='Mean, single cell' )
-
+    ax.plot( nx, pdf_ally, lw=3, c='g', label='Mean, all '+ctype+' cells' )
+    ax.plot( nx, pdf_ny, lw=3, c='m', marker='^', ms=8, label='Mean, single '+ctype+' cell' )
+    if vline:
+        ax.axvline( vline, linestyle=':', color='k' )
     # add a histogram for a single frame
     if persfile:
         ts = numpy.asarray( get_ts( persfile ), dtype=numpy.int )
-        n, bins = numpy.histogram( ts, bins=len(nx)-1, range=(nx.min(),nx.max()) )
+        n, bins = numpy.histogram( ts, bins=nbins, range=(nx.min(),nx.max()) )
         ts_pdf = pdf( bins[:-1], n )
 
-        print "ts_pdf", ((bins[1:] - bins[:-1])*ts_pdf).sum()
-        width = nx[1]-nx[0]
-        ax.bar( bins[:-1], ts_pdf, width=width, color='g', alpha=0.7, label='Single frame distribution' )
+        #print 'ts_pdf', ((bins[1:] - bins[:-1])*ts_pdf).sum()
+        width = bins[1]-bins[0]  #nx[1]-nx[0]
+        ax.bar( bins[:-1], ts_pdf, width=width, color=color, alpha=0.5, label='Single frame distribution' )
         #ax.plot( bins[:-1], ts_pdf, marker='o', ms=6, lw=3, label='Single frame' )
+    plt.ylim( 0.00001, 0.1 )
+    plt.xlim( right=150 )
+    plt.xlabel( 'Lifespan', fontsize=16 )
+    plt.ylabel( 'Normalized distribution', fontsize=16 )
+
     plt.legend()
     fig.show()
     return fig, bins, ts_pdf  #, n, bins
@@ -523,31 +574,55 @@ def plot_scatter( ts, log=False, cutoff=0.2 ):
     fig.show()
     return fig
  
-def plot_hist( fname, color='blue', normed=False, fontsize=20 ):
+def plot_hist( fname, nbins=None, scale=1.0, color='blue',
+               gaussian=False, sigma=1.0, normed=False, fontsize=14 ):
     """
     Plot a histogram of generator lifespan along the diagonal.
 
     fname -- full path to perseus output file.
     """
+    # for normpdf() function
+    import matplotlib.mlab as mlab
+    
     ts = get_ts ( fname )
     # the (almost) infinite generator overwhelms the plot
     ts = ts[:-1]
+
+    print ts
+    if scale:
+        ts = numpy.asarray( ts, dtype=numpy.float )
+        ts /= scale
+
+    # plot the histogram
     fig = plt.figure()
     ax = fig.gca()
     # the histogram of the data
-    n, bins, patches = ax.hist( ts, bins=ts.max()-ts.min(),
-                                normed=normed, facecolor=color, alpha=0.75)
-    xticks = [ int( tk ) for tk in ax.get_xticks() ]
-    yticks = [ int( tk ) for tk in ax.get_yticks() ]
-    ax.set_xticklabels( xticks, fontsize=fontsize )
-    ax.set_yticklabels( yticks, fontsize=fontsize )
+    if not nbins:
+        nbins = ts.max()-ts.min()
+    n, bins, patches = ax.hist( ts, bins=nbins, normed=normed,
+                                facecolor=color, alpha=0.75)
+
+    if gaussian:
+        mu = 0
+        bincenters = 0.5 * ( bins[1:] + bins[:-1] )
+        # add a 'best fit' line for the normal PDF
+        y = mlab.normpdf( bincenters, mu, sigma)
+        l = ax.plot( bincenters, y, 'r--', linewidth=2 )
+
+    # xticks = [ int( tk ) for tk in ax.get_xticks() ]
+    # yticks = [ int( tk ) for tk in ax.get_yticks() ]
+    # ax.set_xticklabels( xticks, fontsize=fontsize )
+    # ax.set_yticklabels( yticks, fontsize=fontsize )
 
     #ax.set_title( r'Distribution of generator lifespans along diagonal' )
-    ax.set_xlabel( r"Lifespan (death-birth)", fontsize=fontsize )
+    ax.set_xlabel( r"Lifespan", fontsize=fontsize )
     ax.set_ylabel( r"Number of generators ($\beta_1$)", fontsize=fontsize )
-    ax.grid( True )
+    #ax.grid( True )
+
+    ax.set_xlim( 0,21 )
+    
     plt.show()
-    return fig
+    return fig, ts, bins
 
 def dir_list( fdir, betti=1 ):
     """
@@ -636,12 +711,16 @@ def plot_hist_colors( cell, color='blue',
 
 
 def plot_midrange_ts( new_file, old_file, skip=10, fontsize=20,
-                      lines=None, plot_mean=False ):
+                      lines=None, plot_mean=False, means=False ):
     """
     Plots two times series of midrange generators.
     """
-    ts_new = numpy.loadtxt( new_file )
-    ts_old = numpy.loadtxt( old_file )
+    if type( new_file ) == str and type( old_file ) == str:
+        ts_new = numpy.loadtxt( new_file )
+        ts_old = numpy.loadtxt( old_file )
+    else:
+        ts_new = new_file
+        ts_old = old_file
 
     fig = plt.figure( dpi=160, figsize=([10,4]) )
     ax = fig.gca()
@@ -655,15 +734,17 @@ def plot_midrange_ts( new_file, old_file, skip=10, fontsize=20,
         for line in lines:
             v = int( line/float(skip) )
             ax.vlines( v, vmin+smidge, vmax, linestyle='dashed', linewidth=2 )
-
+    if means:
+        ax.axhline( ts_new.mean(), color='k', linestyle='--', lw=2, label="New cell mean" )
+        ax.axhline( ts_old.mean(), color='k', linestyle='--', lw=2, label="Old cell mean" )        
 
     # set some axis attributes; account for skip when setting tick marks
     xticks = [ skip*int( tk ) for tk in ax.get_xticks() ]
     yticks = [ int( tk ) for tk in ax.get_yticks() ]
     ax.set_xticklabels( xticks, fontsize=fontsize )
     ax.set_yticklabels( yticks, fontsize=fontsize )
-    ax.set_xlabel( r"time", fontsize=fontsize )
-    ax.set_ylabel( r"# of midrange generators", fontsize=fontsize )
+    ax.set_xlabel( r"Frame Number", fontsize=fontsize )
+    ax.set_ylabel( r"Midrange generators", fontsize=fontsize )
 
     # plot mean and std range
     if plot_mean:
@@ -685,9 +766,9 @@ def plot_midrange_ts( new_file, old_file, skip=10, fontsize=20,
         # COMMENTED OUT BELOW
         upper_yi = stineman_interp( xi, bins[:-1], upper, yp )
         lower_yi = stineman_interp( xi, bins[:-1], lower, yp )
+
     
-    
-    fig.show()
+        #fig.show()
     return fig
 
 def plot_hist_cut_axis( cells, color='blue',
@@ -854,10 +935,7 @@ def plot_hist_stack(  cells, color='blue',
     import matplotlib.colors as colors
 
 
-    # create a color instance
-    rcolors = numpy.random.random( (len(cells),3) )
-    cc = colors.ColorConverter()
-    cmap = [ cc.to_rgb( c ) for c in rcolors ]
+   
 
     # This method works with mpl 0.99 (plt.subplot() works with >1.1.0 )
     fig = plt.figure( figsize=(6,5) )
@@ -868,21 +946,31 @@ def plot_hist_stack(  cells, color='blue',
     t0 = start = time.time()
 
     # cell == cell directory containing persistence diagrams
-    all_ts = []
-    for c, cell in enumerate( cells ):
-        # list of lifespans for each frame in cell
-        # concatenate all of the diagrams for cell lifespans into one
-        # timeseries
-        ts = [ get_ts ( frame ) for frame in cell[:ts_max:skip] ]
-        ts = numpy.hstack( ts )
-        # convert and normalize, then append to the list of time series
-        ts = numpy.asarray( ts, dtype=numpy.float )
-        ts /= ts.max()
-        all_ts.append( ts )
+    if type( cells ) == list:
+        all_ts = []
+        for c, cell in enumerate( cells ):
+            # list of lifespans for each frame in cell
+            # concatenate all of the diagrams for cell lifespans into one
+            # timeseries
+            ts = [ get_ts ( frame ) for frame in cell[:ts_max:skip] ]
+            ts = numpy.hstack( ts )
+            # convert and normalize, then append to the list of time series
+            ts = numpy.asarray( ts, dtype=numpy.float )
+            ts /= ts.max()
+            all_ts.append( ts )
 
-        newtime = time.time()
-        print "Done creating time series. Took", newtime - start, " seconds"
-        start = newtime
+            newtime = time.time()
+            print "Done creating time series. Took", newtime - start, " seconds"
+            start = newtime
+    else:
+        print "Reading ", cells, "... "
+        with open( cells ) as fh:
+            all_ts = pkl.load( fh )
+        
+    # create a color instance
+    rcolors = numpy.random.random( ( len( all_ts ), 3 ) )
+    cc = colors.ColorConverter()
+    cmap = [ cc.to_rgb( c ) for c in rcolors ]
         
     min_len = min( [ len( t ) for t in all_ts ] )
     n, bins, patches = ax.hist( all_ts, bins=nbins,#min_len/float(2*ts_max),
@@ -1007,36 +1095,245 @@ def load_all_bt( prefix='' ):
         BT[eps]['old'] = old
         BT[eps]['new'] = new
     return BT
+
+def boxplot_midrange( oldfile='old_midrange_eps40_350.pkl',
+                      newfile='new_midrange_eps40_350.pkl',
+                      prefix='/Users/jberwald/github/local/caja-matematica/pyRBC/data/' ):
+    """
+    """
+    # list to hold the arrays
+    data = []
+    old = prefix + oldfile
+    new = prefix + newfile
+    with open( old ) as fh:
+        # values stored in dict, so convert them...
+        old_data = pkl.load( fh )
+        od = numpy.vstack( old_data.values() )
+    with open( new ) as fh:
+        new_data = pkl.load( fh )
+        nd = numpy.vstack( new_data.values() )
+    # put new and old data into a list for boxplot
+    # select column with means (0->median, 2->std)
+    data = [nd[:,1], od[:,1]]
+
+    # now plot stuff
+    fig = plt.figure()
+    ax = fig.add_subplot( 111 )
+    bp = plt.boxplot(data, notch=0, sym='+', vert=1, whis=1.5,
+                     patch_artist=True, bootstrap=5000)
+    colors = ['blue','red']
+    boxes = bp[ 'boxes' ]
+    for i, box in enumerate( boxes ):
+        box.set_facecolor( colors[i] )
+        box.set_alpha( 0.8 )
+        #  box.update()
+    ax.set_xticklabels( [ 'Young', 'Old' ] )
+    plt.draw()       
+    #fig.show()
+    return fig, od, nd
          
+def midrange_stats( fname=None, new=True, stats=False, ngens=False ):
+    """
+    For the midrange generators in each frame in each cell, find a
+    tuple = ( median, mean, std ). 
+    """
+    newlist = ['new_10' , 'new_110125', 'new_130125', 'new_140125', 'new_3',
+               'new_4', 'new_40125', 'new_50125', 'new_6', 'new_60125', 'new_9']
+    oldlist = ['old_100125', 'old_120125', 'old_15', 'old_2', 'old_4000', 'old_4001',
+               'old_5',  'old_50125',  'old_6',  'old_7',  'old_8',  'old_9',  'old_90125']
+
+    if fname:
+        print "\nreading " + fname + " ... "
+        if new:
+            cell_list = newlist
+        else:
+            cell_list = oldlist
+        with open( fname ) as fh:
+            gens = pkl.load( fh )
+    else:
+        # previous versions, static file names
+        if new:
+            print "computing New means...\n"
+            cell_list = newlist
+            with open( '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/new_midrange_means_normed_eps30.pkl' ) as fh:
+                gens = pkl.load( fh )
+        else:
+            print "computing Old means...\n"
+            cell_list = oldlist
+            with open( '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/old_midrange_means_normed_eps30.pkl' ) as fh:
+                gens = pkl.load( fh )
+        
+    # store (median, means, std) in list, within dictionary keyed by cell name
+    data_dict = {}
+
+    if stats:
+        # compute the stats
+        for i, cell in enumerate( cell_list ):
+            ci = gens[i]
+            # loop over each frame's (birth,death) coords
+            # store stats for lifespan for each in a list
+            stats = []
+            for x in ci:
+                try:
+                    diff = x[:,1] - x[:,0]
+                    data = ( numpy.median( diff ), diff.mean(), diff.std() )
+                except TypeError:
+                    data = ( 0., 0., 0. )
+                stats.append( data )
+            data_dict[ cell ] = numpy.asarray( stats )
+    elif ngens:
+        # concatenate the data and return
+        for i, cell in enumerate( cell_list ):
+            ci = gens[i]
+            numgens = []
+            for x in ci:
+                try:
+                    numgens.append( len( x ) )
+                except TypeError:
+                    numgens.append( 0 )
+            data_dict[ cell ] = numpy.array( numgens, dtype=int )
+
+    return data_dict
+
+def midrange_timeseries( old_prefix, new_prefix, eps1, eps2, normed=False, plot_fig=False ):
+    """
+    Time series of 
+    """
+    # if normed:
+    #     old_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/old_midrange_means_normed_eps'
+    #     new_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/new_midrange_means_normed_eps'
+    # else:
+    #     old_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/old_midrange_eps'
+    #     new_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/new_midrange_eps'
+
+    
+    old_fname = old_prefix + str(eps1) + "_" + str(eps2) + ".pkl"
+    new_fname = new_prefix + str(eps1) + "_" + str(eps2) + ".pkl"
+    # dictionary keyed=cells, values=array of number of midrange
+    # generators for each frame of cell
+    old_mr = midrange_stats( fname=old_fname, ngens=True )
+    new_mr = midrange_stats( fname=new_fname, ngens=True )
+
+    if plot_fig:
+        figs = []
+        oldkeys = old_mr.keys()
+        newkeys = new_mr.keys()
+        for i in [7,8]: #range(3):
+            oldname = oldkeys[i]
+            newname = newkeys[i]
+            oldvals = old_mr[ oldkeys[i] ]
+            newvals = new_mr[ newkeys[i] ]
+            fig = plot_midrange_ts( newvals, oldvals, skip=10, means=True,
+                                    fontsize=14 )
+            ax = fig.gca()
+            #title = "Old cell vs New cell ("+str(i)+")"
+            #ax.set_title( title )
+
+            # adjust to tighten the bbox and make sure the xlabel fits
+            # on the figure
+            fig.subplots_adjust( bottom=0.14, left=0.07, right=0.96, top=0.95 )
+                
+            fig.show()
+            # fig.savefig( '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/'+\
+            #              'midrange_ts_'+oldname+'-'+newname+'eps'+\
+            #              str(eps1)+'_'+str(eps2)+'.png',
+            #              dpi=400, transparent=True )    
+            
+        
+            # now add means to the plot
+            #new_mean = newvals.mean()
+            #old_mean = oldvals.mean()
+
+            # ax = fig.gca()
+            # ax.axhline( new_mean, color='b', linestyle='--', lw=2, label="New cell mean" )
+            # ax.axhline( old_mean, color='r', linestyle='--', lw=2, label="Old cell mean" )
+            # ax.legend()
+            figs.append( fig )
+        return figs
+    else:
+        return old_mr, new_mr
+
 
 if __name__ == "__main__":
 
+    # plot time series for midrange generators
+    if 0:
+       # old_prefix = '/Users/jberwald/github/local/caja-matematica/pyRBC/data/old_midrange_means_normed_eps'
+       # new_prefix = '/Users/jberwald/github/local/caja-matematica/pyRBC/data/new_midrange_means_normed_eps'
+       # old_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/old_midrange_orig_eps'
+       # new_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/new_midrange_orig_eps'
+       # old_prefix = '/Users/jberwald/github/local/caja-matematica/pyRBC/data/old_midrange_normed_eps'
+       # new_prefix = '/Users/jberwald/github/local/caja-matematica/pyRBC/data/new_midrange_normed_eps'
+       for eps1 in [40,70]:#,50,60,70]:
+           for eps2 in [350]:
+               fig = midrange_timeseries( old_prefix, new_prefix,
+                                          eps1, eps2, normed=True, plot_fig=True )
+               # olddata = midrange_stats( old_prefix + str(eps1) + "_" +str(eps2)+'.pkl', ngens=True )
+               # newdata = midrange_stats( new_prefix + str(eps1) + "_" +str(eps2)+'.pkl', ngens=True )
+               # for i,k in enumerate( olddata.keys() ):
+               #     numpy.savetxt( old_prefix+str(eps1)+"_"+str(eps2)+"_cell"+str(i)+'.txt',
+               #                    olddata[k] )
+               # for i,k in enumerate( newdata.keys() ):
+               #     numpy.savetxt( new_prefix+str(eps1)+"_"+str(eps2)+"_cell"+str(i)+'.txt',
+               #                    newdata[k] )
     if 1:
-        prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
-        #prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/Old/'
-        newlist = ['new_10' , 'new_110125', 'new_130125', 'new_140125', 'new_3',
-                   'new_4', 'new_40125', 'new_50125', 'new_6', 'new_60125', 'new_9']
-        oldlist = ['old_100125', 'old_120125', 'old_15', 'old_2', 'old_4000', 'old_4001',
-                   'old_5',  'old_50125',  'old_6',  'old_7',  'old_8',  'old_9',  'old_90125']
+        cell_type = 'new'
+        #cell_type = 'old'
 
-        cells = [ prefix + c + '/' for c in newlist ]
-        #cells = [ prefix + c + '/' for c in oldlist ]
-        
+        if cell_type == 'new':
+            prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
+            newlist = ['new_10' , 'new_110125', 'new_130125', 'new_140125', 'new_3',
+                       'new_4', 'new_40125', 'new_50125', 'new_6', 'new_60125', 'new_9']
+            cells = [ prefix + c + slash for c in newlist ]
+        else:
+            prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/Old/'
+            oldlist = ['old_100125', 'old_120125','old_15', 'old_2', 'old_4000', 'old_4001',
+                       'old_5',  'old_50125',  'old_6',  'old_7',  'old_8',  'old_9',
+                       'old_90125']
+            cells = [ prefix + c + slash for c in oldlist ]
+
         frames = [ dir_list( c ) for c in cells ]
 
         dc = dict_of_cell_dirs( cells )
         #ts = concat_timeseries( dc, ts_max=-1, skip=10 )
 
-        # find thresholds where first generators above lifespan <eps> are born
-        bt = []
-        for eps in [30, 40]:
-            print "eps = ", eps
-            print ""
+        # birth times
+        bt = defaultdict( dict )
+        for eps in [60,70]:
             for cell in cells:
-                bt.append( get_birth_times( cell, eps ) )
-            # save to disk!
-            with open( './data/bt_new_normed_eps'+str(eps)+'.pkl', 'w' ) as fh:
-                pkl.dump( bt, fh )
+                print "eps = ", eps
+                print "cell = ", cell
+                print ""
+                # set upper bound to -1 for all non-noisy gens
+                bt[eps][cell] = get_birth_times( cell, eps, -1 )
+        with open( './timeseries/'+cell_type+'_birth_time_lb'+str(eps)+'.pkl', 'w' ) as fh:
+            pkl.dump( bt, fh )
+        
+        # for eps in [20,30]: #40,50,60,70]:
+        #     for eps2 in [200,250,300,350]:
+        #         print "eps = ", eps
+        #         print "eps2 = ", eps2
+        #         print ""
+
+        #         # find thresholds where first generators above lifespan <eps> are born
+        #         # These paths assume we are running from ~/Dropbox/Projects/rbc/pyRBC directory
+        #         #fname = './data/'+cell_type+'_midrange_means_normed_eps'+str(eps)+'_'+str(eps2)+'.pkl'
+        #         fname = './data/'+cell_type+'_midrange_normed_eps'+str(eps)+'_'+str(eps2)+'.pkl'
+        #         fname2 = './data/'+cell_type+'_midrange_normed_numgens_eps'+str(eps)+'_'+str(eps2)+'.pkl'
+
+        #         gens = []
+        #         for cell in cells:
+        #             print "computing midrange generators for "+ cell
+        #             print ""
+        #             gens.append( get_midrange_gens( cell, eps, eps2, normed=True ) )
+        #         # save to disk!
+        #         with open( fname, 'w' ) as fh:
+        #             pkl.dump( gens, fh )
+                    
+                # compute stats for midrange gens
+                # M = midrange_stats( fname, ngens=True )
+                # with open( fname2, 'w' ) as fh:
+                #     pkl.dump( M, fh )
     
     #fig = plot_scatter( ts, log=True )
     
@@ -1059,7 +1356,7 @@ if __name__ == "__main__":
     
     if 0:
         # find the old maxes. do these in sequence to avoid killing
-        # the disk with thousands of minute search (sigh).
+        # the disk with thousands of minute searches (sigh).
         old_prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/Old/'
         old_dirs= os.listdir( old_prefix )
         old_cells = [ old_prefix + c + slash for c in old_dirs ]
@@ -1079,4 +1376,7 @@ if __name__ == "__main__":
             with open( './data/new_maxes.pkl', 'w' ) as fh:
                 pkl.dump( new_maxes, fh )
 
-      
+       
+            
+                
+        
