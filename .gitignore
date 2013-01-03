@@ -31,3 +31,5 @@ pip-log.txt
 *.pdf
 *.png
 *.txt
+*.svg
+
