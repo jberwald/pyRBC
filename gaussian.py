@@ -85,8 +85,9 @@ def sublevel( data, height ):
     G[ where( data == 0 ) ] = [1,1,1]
     # outName = fname.split('/')[-1][:-4] + '_' + str( h )
     # output = outdir + outName
+    
     # now plot stuff
-    fig = plt.figure( figsize=(8,8), frameon=False, dpi=160 )
+    fig = plt.figure( figsize=(8,8), frameon=False )
     ax = fig.gca()
     ax.set_title( 'sublevel ' + str( h ) )
     ax.imshow( G )
@@ -191,8 +192,8 @@ def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
         big[ nx-15, ny+9 ] += 1.0
         big[ nx-16, ny+8 ] += 1.0
         big[ nx-16, ny+9 ] += 1.0
-        big[ nx-14, ny+8 ] += 1.0
-        big[ nx-14, ny+9 ] += 1.0
+        # big[ nx-14, ny+8 ] += 1.0
+        # big[ nx-14, ny+9 ] += 1.0
         # big[ nx-16, ny+8 ] += 1.0
         # big[ nx-16, ny+9 ] += 1.0
              

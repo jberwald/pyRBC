@@ -195,6 +195,8 @@ def plot_sublevel_set( frame, height, bndfile=None, persfile=None,
     frame -- path to array on disk or Numpy array.
 
     height -- function height at which to take sublevel set.
+
+    Returns figure object
     """
     h = height
     # text file
@@ -238,7 +240,7 @@ def plot_sublevel_set( frame, height, bndfile=None, persfile=None,
         G[ numpy.where( data <= thresh ) ] = [1,1,1,0]
    
     # now plot stuff
-    fig = plt.figure( frameon=False )
+    fig = plt.figure( frameon=False, dpi=160 )
 
     # make things transparent?
     if transparent:

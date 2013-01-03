@@ -40,19 +40,6 @@ def get_gens_between (file, epsilon1, epsilon2):
 def get_gens_between_normed( fname, eps1, eps2, means=False ):
     """
     """
-    # with open( fname, 'r' ) as fh:
-    #     s = fh.read()
-    # goodGens = []
-    # #split up generators
-    # stringGens = s.split('\n')
-    # stringGens.remove('')
-    # gens = []
-    
-    # #parse generators
-    # for sgen in stringGens:
-    #     gens.append(map(int,sgen.split(' ')))
-    # gens = numpy.array( gens )
-
     gens = numpy.loadtxt( fname )
     y1, y2 = normalize_mid_lifespan( gens, eps1, eps2 )
         

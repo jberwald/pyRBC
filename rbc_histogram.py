@@ -77,7 +77,7 @@ def all_maxes( cell_list ):
     return max_list
         
 
-def get_birth_times( cell, eps1, eps2=150, normed=True ):
+def get_birth_times( cell, eps1, eps2=150, normed=True, first_bt=False ):
     """
     cell -- path to directory containing Perseus generator
     file (one for each frame).
@@ -107,7 +107,10 @@ def get_birth_times( cell, eps1, eps2=150, normed=True ):
             gens = get_gens_between( frame, eps1, eps2 )
         if not gens:
             continue
-        birth_times.append( gens[0][0] )
+        if first_bt:
+            birth_times.append( gens[0][0] )
+        else:
+            birth_times.append( gens )
     return birth_times
 
 
@@ -202,7 +205,7 @@ def boxplotter( fname='/Users/jberwald/github/local/caja-matematica/pyRBC/data/l
 def plot_hist_birth_times( bt_old=None, bt_new=None,
                            stacked=None,
                            normalize=False, bins=50,
-                           transparent=True, **kwargs ):
+                           transparent=True, log=False, **kwargs ):
     """
     Plot histograms of birth times. Provide both to plot both new and
     old on one histogram.
@@ -217,45 +220,58 @@ def plot_hist_birth_times( bt_old=None, bt_new=None,
         fig.patch.set_alpha( 0.0 )
     ax = fig.gca()
     if bt_old is not None:
-        # concatenate data
+        # concatenate data if bt_old is not an array
         if not hasattr( bt_old, "mean" ):
             old = numpy.hstack( bt_old )
         else:
             old = bt_old
         oldhist, bins, patches = ax.hist( old, bins=bins, hatch='//',
-                                          color='r', alpha=0.75 )
+                                          color='r', alpha=0.75, log=log,
+                                          normed=normalize, label="Old cells" )
         mean_old = old.mean()
+        median_old = numpy.median( old )
         std_old = old.std()
         ax.axvline( mean_old, 
                     color='k', linestyle='dashed', lw=1.5 )
         ax.axvspan( mean_old - std_old,
                     mean_old + std_old, facecolor='r', alpha=0.3 )
-            # add an arrow -- NOT WORKING YET
-        patches = []
-        arrow = mpatches.ArrowStyle( "Fancy, head_length=.4, head_width=.4, tail_width=.4") 
-        patches.append(arrow)
-        # plt.text(pos[0,5], pos[1,5]-0.15, "Arrow", ha="center",
-        #          family=font, size=14)
     if bt_new is not None:
         if not hasattr( bt_new, "mean" ):
             new = numpy.hstack( bt_new )
         else:
             new = bt_new
         newhist, bins, patches = ax.hist( new, bins=bins,
-                                          color='b', alpha=0.75 )
+                                          color='b', alpha=0.75, log=log,
+                                          normed=normalize, label="New cells" )
         mean_new = new.mean()
+        median_new = numpy.median( new )
         std_new = new.std()
-        ax.axvline( mean_new,
+        ax.axvline( mean_new, #mean_new,
                     color='k', linestyle='dashed', lw=1.5 )
         ax.axvspan( mean_new - std_new,
                     mean_new + std_new, facecolor='b', alpha=0.3 )
     else:
-        # this logic isn't right for the if-else block. 
+        # this logic isn't right for the if-else block. But we'll just move on for now...
         if not bt_old and not bt_new:
             print "Must provide at least one set of birth times."
             return None
-    ax.set_xlabel( r'$\tau$ (normalized)', fontsize=16 )
-    ax.set_ylabel( 'Number of frames', fontsize=16 )
+        #    ax.set_xlabel( r'$\tau$ (normalized)', fontsize=16 )
+    ax.set_xlabel( r'First birth time', fontsize=16 )
+    ax.set_ylabel( r'Number of frames', fontsize=16 )
+   
+    # ax.set_yticklabels( [str( int(y) ) for y in yticks
+    #                      if y!=0 else ], fontsize=20 )
+
+    # This part adds the arrows defined above.
+    # collection = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.4)
+    # ax.add_collection(collection)
+
+    # set axes limits to align with top of vlines for aesthetic
+    # reasons
+    themin = min( old.min(), new.min() )
+    themax = max( old.max(), new.max() )
+    ax.set_xlim( themin, themax ) #max( old_max, new_max ) )
+
     xticks = ax.get_xticks()
     yticks = ax.get_yticks()
     ax.set_xticklabels( [str( x ) for x in xticks], fontsize=14 )
@@ -266,17 +282,7 @@ def plot_hist_birth_times( bt_old=None, bt_new=None,
         else:
             ylabels.append( ' ' ) # empty 0 on y axis
     ax.set_yticklabels( ylabels, fontsize=14 )
-    # ax.set_yticklabels( [str( int(y) ) for y in yticks
-    #                      if y!=0 else ], fontsize=20 )
-
-    # This part adds the arrows defined above.
-    # collection = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.4)
-    # ax.add_collection(collection)
-
-    # set axes limits to align with top of vlines for aesthetic
-    # reasons
-    #ax.set_ylim( 0.0, old_max ) #max( old_max, new_max ) )
-    
+    plt.legend()
     
     fig.show()
     return fig, new, old
@@ -297,6 +303,8 @@ def plot_simple_hist( ts, nbins=1000, color='b' ):
                                 edgecolor='none' )
     ax.set_xlabel( 'Lifespan', fontsize=20 )
     ax.set_ylabel( 'Number of generators', fontsize=20 )
+    ax.tick_params( axis='both', which='major', labelsize=16 )
+    #ax.tick_params(axis='both', which='minor', labelsize=8)
     ax.set_ylim( bottom=0.5 ) 
 
     return fig
@@ -401,7 +409,8 @@ def plot_hist_all( ts, nbins=50, transparent=True, norm_it=False, **kwargs ):
 
     return xi, masked_yi, lower_yi, upper_yi, fig, (n, bins, patches)
 
-def plot_hist_figure( ts, persfile=None, single=1, norm_it=True, nbins=100, new=True, vline=None ):
+def plot_hist_figure( ts, persfile=None, single=1, norm_it=True,
+                      nbins=100, cell_type='new', vline=None ):
     """
     Plot the histogram figure for the RBC paper.
 
@@ -416,7 +425,11 @@ def plot_hist_figure( ts, persfile=None, single=1, norm_it=True, nbins=100, new=
 
     norm_it -- Toggle whether to return a normalized histogram.
 
+    nbins -- number of bins.
+
     new -- New or Old cells.
+
+    vline -- x-axis location of vertical dotted line. If None, no line is drawn.
 
     Note: Values used in RBC paper:
 
@@ -426,38 +439,47 @@ def plot_hist_figure( ts, persfile=None, single=1, norm_it=True, nbins=100, new=
     new_110125-concatenated-ASCII_2000_1.txt
     old_120125-concatenated-ASCII_2000_1.txt
     """
-    if new:
+    # for text object $\tau^*$ below
+    from matplotlib.text import Text
+    if cell_type == 'new':
         color = 'blue'
         ctype = 'new'
-    else:
+    elif cell_type == 'old':
         color = 'red'
         ctype = 'old'
+    else:
+        color = 'green'
+        ctype = 'all'
     # compute stats for all cells
     out_all = plot_hist_all( ts, norm_it=norm_it )
     allx = out_all[0]
     ally = out_all[1]
 
     # compute stats for chosen single cell
-    out = plot_hist_all( [ts[single]], norm_it=norm_it )
-    nx = out[0]
-    ny = out[1]
+    if single is not False:
+        out = plot_hist_all( [ts[single]], norm_it=norm_it )
+        nx = out[0]
+        ny = out[1]
+        pdf_ny = pdf( nx, ny )
 
     # now normalize everything by dividing by total area ( y --> PDF )
     pdf_ally = pdf( allx, ally )
-    pdf_ny = pdf( nx, ny )
 
     # output some stats 
-    print "\int { pdf_ally } = ", ((nx[1:]-nx[:-1]) * pdf_ally[:-1]).sum()
-    print "\int { pdf_ny } = ", ((nx[1:]-nx[:-1]) *pdf_ny[:-1]).sum()
+    # print "\int { pdf_ally } = ", ((nx[1:]-nx[:-1]) * pdf_ally[:-1]).sum()
+    # print "\int { pdf_ny } = ", ((nx[1:]-nx[:-1]) *pdf_ny[:-1]).sum()
 
     fig = plt.figure()
     ax = fig.gca()
     #    ax.set_xscale( 'log' )
     ax.set_yscale( 'log' )
     #ax.set_aspect( 1 )
- 
-    ax.plot( nx, pdf_ally, lw=3, c='g', label='Mean, all '+ctype+' cells' )
-    ax.plot( nx, pdf_ny, lw=3, c='m', marker='^', ms=8, label='Mean, single '+ctype+' cell' )
+
+
+    if single is not False:
+        ax.plot( nx, pdf_ally, lw=3, c='g', label='Mean, all '+ctype+' cells' )
+        ax.plot( nx, pdf_ny, lw=3, c='m', marker='^', ms=8,
+                 label='Mean, single '+ctype+' cell' )
     if vline:
         ax.axvline( vline, linestyle=':', color='k' )
     # add a histogram for a single frame
@@ -468,10 +490,41 @@ def plot_hist_figure( ts, persfile=None, single=1, norm_it=True, nbins=100, new=
 
         #print 'ts_pdf', ((bins[1:] - bins[:-1])*ts_pdf).sum()
         width = bins[1]-bins[0]  #nx[1]-nx[0]
-        ax.bar( bins[:-1], ts_pdf, width=width, color=color, alpha=0.5, label='Single frame distribution' )
+        ax.bar( bins[:-1], ts_pdf, width=width, color=color, alpha=0.5,
+                label='Single frame distribution' )
         #ax.plot( bins[:-1], ts_pdf, marker='o', ms=6, lw=3, label='Single frame' )
+
+    #ax.set_xticklabels( [str(int(x)) for x in xticks], fontsize=20 )
     plt.ylim( 0.00001, 0.1 )
     plt.xlim( right=150 )
+
+    if vline:
+        # add a \tau^* i nthe right spot
+        tks, labels = plt.xticks()
+        tks = list( tks )
+        tks.append( vline )
+        tks.sort()
+        # find index of new vline tick
+        loc = tks.index( vline )
+        tau = Text( text='$\tau^{*}$' )
+        new_labs = []
+        # insert \tau into correct spot (Text( '\tau' ) doesn't seem to
+        # work)
+        for x in tks:
+            if x == vline:
+                if ctype == 'new':
+                    L_text = r'$L_{new}$'
+                elif ctype == 'old':
+                    L_text = r'$L_{old}$'
+                else:
+                    L_text = r'$L_{all}$'
+                new_labs.append( L_text )
+            else:
+                new_labs.append( str( int(x) ) )
+        ax.set_xticks( tks )
+        ax.set_xticklabels( new_labs, fontsize=12 )
+
+    # now back to normal labeling and stuff
     plt.xlabel( 'Lifespan', fontsize=16 )
     plt.ylabel( 'Normalized distribution', fontsize=16 )
 
@@ -1197,7 +1250,7 @@ def midrange_stats( fname=None, new=True, stats=False, ngens=False ):
 
 def midrange_timeseries( old_prefix, new_prefix, eps1, eps2, normed=False, plot_fig=False ):
     """
-    Time series of 
+    Time series of midrange (==robust) generators.
     """
     # if normed:
     #     old_prefix = '/Users/jberwald/Dropbox/Projects/rbc/pyRBC/data/old_midrange_means_normed_eps'
@@ -1218,6 +1271,7 @@ def midrange_timeseries( old_prefix, new_prefix, eps1, eps2, normed=False, plot_
         figs = []
         oldkeys = old_mr.keys()
         newkeys = new_mr.keys()
+        # choose a couple of cells to plot
         for i in [7,8]: #range(3):
             oldname = oldkeys[i]
             newname = newkeys[i]
@@ -1277,15 +1331,17 @@ if __name__ == "__main__":
                #     numpy.savetxt( new_prefix+str(eps1)+"_"+str(eps2)+"_cell"+str(i)+'.txt',
                #                    newdata[k] )
     if 1:
-        cell_type = 'new'
-        #cell_type = 'old'
+        #cell_type = 'new'
+        cell_type = 'old'
 
         if cell_type == 'new':
+            epsrange = [60, 65,70,73]
             prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/New/'
             newlist = ['new_10' , 'new_110125', 'new_130125', 'new_140125', 'new_3',
                        'new_4', 'new_40125', 'new_50125', 'new_6', 'new_60125', 'new_9']
             cells = [ prefix + c + slash for c in newlist ]
         else:
+            epsrange = [50,55,60, 65]
             prefix = '/data/PerseusData/PerseusOutput/original/2d_sparse/Old/'
             oldlist = ['old_100125', 'old_120125','old_15', 'old_2', 'old_4000', 'old_4001',
                        'old_5',  'old_50125',  'old_6',  'old_7',  'old_8',  'old_9',
@@ -1299,14 +1355,16 @@ if __name__ == "__main__":
 
         # birth times
         bt = defaultdict( dict )
-        for eps in [60,70]:
+        
+        for eps in epsrange:
             for cell in cells:
                 print "eps = ", eps
                 print "cell = ", cell
                 print ""
                 # set upper bound to -1 for all non-noisy gens
                 bt[eps][cell] = get_birth_times( cell, eps, -1 )
-        with open( './timeseries/'+cell_type+'_birth_time_lb'+str(eps)+'.pkl', 'w' ) as fh:
+        er = ''+str(epsrange[0])+'-'+str(epsrange[-1])
+        with open( './timeseries/'+cell_type+'_birth_time_ALL_lb'+er+'.pkl', 'w' ) as fh:
             pkl.dump( bt, fh )
         
         # for eps in [20,30]: #40,50,60,70]:
@@ -1351,8 +1409,8 @@ if __name__ == "__main__":
             old_ = './data/old_bt_eps'+str(eps)+'.pkl'
             new_ = './data/new_bt_eps'+str(eps)+'.pkl'
             old, new = load_birth_times( old_, new_ )
-            BT[30]['old'] = old
-            BT[30]['new'] = new
+            BT[eps]['old'] = old
+            BT[eps]['new'] = new
     
     if 0:
         # find the old maxes. do these in sequence to avoid killing

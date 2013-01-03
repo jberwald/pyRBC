@@ -59,7 +59,8 @@ def plot_diagram (persFile, lb=0, ub=2, out_type='bin',rmv='Y', dpi=80, fontsize
     fig.show()
     return fig
 
-def plot_diagram_std (persFile, fontsize=20, scale=None, show_fig=True):
+def plot_diagram_std (persFile, fontsize=16, scale=None, color='b',
+                      show_fig=True, fig=None):
     """
     persFile -- path to <perseus output>_*.txt, where * is the dimension.
 
@@ -82,11 +83,12 @@ def plot_diagram_std (persFile, fontsize=20, scale=None, show_fig=True):
     # non-infinite gens
     normal_idx = numpy.where( deaths != -1 )[0]
 
-    fig = plt.figure( ) #dpi=160 )
-    fig.patch.set_alpha( 0.0 )
+    if not fig:
+        fig = plt.figure( ) #dpi=160 )
+        fig.patch.set_alpha( 0.0 )
     ax = fig.gca()
 
-    ax.plot( births[normal_idx], deaths[normal_idx], 'bo' )
+    ax.plot( births[normal_idx], deaths[normal_idx], color+'o' )
 
     # create diagonal
     diag = [0, maxd+2]
@@ -100,6 +102,10 @@ def plot_diagram_std (persFile, fontsize=20, scale=None, show_fig=True):
     ax.plot( births[inf_idx], inf_vec, 'ro' )
 
     # fix the left x-axis boundary at 0
+    xticks = [ int( tk ) for tk in ax.get_xticks() ]
+    yticks = [ int( tk ) for tk in ax.get_yticks() ]
+    ax.set_xticklabels( xticks, fontsize=fontsize )
+    ax.set_yticklabels( yticks, fontsize=fontsize )
     ax.set_xlim( left=0 )
     if show_fig:
         fig.show()
@@ -144,7 +150,7 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
     # now make the figure
     fig = plt.figure()# dpi=160, frameon=False )
     ax = fig.gca()
-    ax.scatter( nx, ny,c='b',marker='o',lw=.1)
+    ax.scatter( nx, ny,c='b',marker='o',lw=.1, s=50)
     diag = [0, maxLevel]
     ax.plot( diag, diag, 'g-')
     if not gauss:
@@ -169,7 +175,7 @@ def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=N
     ax.set_yticklabels( yticks_str, fontsize=fontsize )
     if lines:
         for line in lines:
-            ax.hlines( line, 0, line, linestyles='dashed' ) ## jjb ***** this is _specifically_ for new11, frame 2000
+            ax.hlines( line, 0, line, linestyles='dashed' ) 
             ax.vlines( line, line, s.max()+1, linestyles='dashed' )
     if zoom:
         ax.set_xlim( (lines[0]-200, lines[1]+200) )

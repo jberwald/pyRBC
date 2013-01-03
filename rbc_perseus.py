@@ -17,7 +17,7 @@ from multiprocessing import Pool
 from subprocess import call
 import pickle as pkl
 
-def perseus ( type, fname, output ):
+def perseus ( fname, output, type='scubtop' ):
     """
         TYPE is input to perseus ex, cubtop, scubtop, etc
         run perseus
