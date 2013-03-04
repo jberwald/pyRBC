@@ -59,47 +59,57 @@ def plot_diagram (persFile, lb=0, ub=2, out_type='bin',rmv='Y', dpi=80, fontsize
     fig.show()
     return fig
 
-def plot_diagram_std (persFile, fontsize=16, scale=None, color='b',
-                      show_fig=True, fig=None):
+def plot_diagram_std (persFile, fontsize=16, scale=1,
+                      color='b', show_fig=True, fig=None,
+                      shape='o', plot_inf=False ):
     """
     persFile -- path to <perseus output>_*.txt, where * is the dimension.
 
     scale -- Factor to scale the birth/death times. 
     """
-    if scale:
-        # cast values as floats for division
-        s = numpy.loadtxt( persFile, dtype=numpy.float, delimiter=' ' )
-        s /= scale
-    else:
-        s = numpy.loadtxt( persFile, dtype=numpy.int, delimiter=' ' )
+    # cast values as floats for division
+    s = numpy.loadtxt( persFile, dtype=numpy.float, delimiter=' ' )
     births = s[:,0]
     deaths = s[:,1]
 
     # max death time
     maxd = deaths.max()
     
-    print "Max death time ",  maxd
-
     # non-infinite gens
     normal_idx = numpy.where( deaths != -1 )[0]
+    # infinite gens
+    inf_idx = numpy.where( deaths == -1 )[0]
+    
+    # scale to match another persistence diagram (used for undoing a
+    # scaling applied to Gaussians in RBC paper).
+    if scale != 1:
+        s /= scale
+        # reset stuff
+        births = s[:,0]
+        deaths = s[:,1]
+        # max death time
+        maxd = deaths.max()
+        inf_vec = (maxd + 1) * numpy.ones( len( inf_idx ) )
+    else:
+        inf_vec = (maxd + 1) * numpy.ones( len( inf_idx ) )
 
+    print "Max death time ",  maxd
+    
     if not fig:
         fig = plt.figure( ) #dpi=160 )
         fig.patch.set_alpha( 0.0 )
     ax = fig.gca()
 
-    ax.plot( births[normal_idx], deaths[normal_idx], color+'o' )
+    # plot the normal generators
+    ax.plot( births[normal_idx], deaths[normal_idx], color+shape )
 
     # create diagonal
-    diag = [0, maxd+2]
+    diag = [0, maxd+1]
     ax.plot(diag, diag, 'g-')
 
-    # infinite gens
-    inf_idx = numpy.where( deaths == -1 )[0]
-    inf_vec = (maxd + 1) * numpy.ones( len( inf_idx ) )
-
     # plot 'em
-    ax.plot( births[inf_idx], inf_vec, 'ro' )
+    if plot_inf:
+        ax.plot( births[inf_idx], inf_vec, 'ro' )
 
     # fix the left x-axis boundary at 0
     xticks = [ int( tk ) for tk in ax.get_xticks() ]
@@ -109,7 +119,9 @@ def plot_diagram_std (persFile, fontsize=16, scale=None, color='b',
     ax.set_xlim( left=0 )
     if show_fig:
         fig.show()
-    print "Total number of persistence intervals", len( births ) # total number of persistence intervals
+
+    # total number of persistence intervals
+    print "Total number of persistence intervals", len( births ) 
     return fig
 
 def plot_diagram_regions( persFile, lines=None, fontsize=16, zoom=False, scale=None, gauss=False ):

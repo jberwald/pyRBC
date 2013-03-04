@@ -20,6 +20,7 @@ def dist( x1, x2, y1, y2 ):
 
 def noisy_gaussian(height, center_x, center_y, width_x, width_y, noise_level, shape):
     """Returns a gaussian function with the given parameters"""
+    rand.seed( seed )
     width_x = float(width_x)
     width_y = float(width_y)
     return lambda x,y: height*exp(
@@ -162,7 +163,7 @@ def clip_below( G, lb ):
     #return G
     #return G[ w ] = 0
     
-def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
+def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None, seed=1234 ):
     """
     Plot a gaussian with a small subpeak and a single pixel ("noise") raised.
 
@@ -177,7 +178,8 @@ def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
     if not noise:
         big = gaussian(big_h, nx, ny, big_w, big_w)(Xin, Yin)
     else:
-        big = noisy_gaussian(big_h, nx, ny, big_w, big_w, noise, shape=Xin.shape)(Xin, Yin)
+        big = noisy_gaussian(big_h, nx, ny, big_w, big_w,
+                             noise, shape=Xin.shape, seed=seed )(Xin, Yin)
 
     # the subpeak
     small_h = 11
@@ -187,11 +189,11 @@ def gauss_bump( size_x=400, size_y=400, shift_x=70, shift_y=-70, noise=None ):
     small = gaussian(small_h, snx, sny, small_w, small_w)(Xin, Yin)
 
     # add pixelated noise at a single point near the peak of 'big'
-    if not noise:
-        big[ nx-15, ny+8 ] += 1.0
-        big[ nx-15, ny+9 ] += 1.0
-        big[ nx-16, ny+8 ] += 1.0
-        big[ nx-16, ny+9 ] += 1.0
+    #if not noise:
+    big[ nx-15, ny+8 ] += 1.0
+    big[ nx-15, ny+9 ] += 1.0
+    big[ nx-16, ny+8 ] += 1.0
+    big[ nx-16, ny+9 ] += 1.0
         # big[ nx-14, ny+8 ] += 1.0
         # big[ nx-14, ny+9 ] += 1.0
         # big[ nx-16, ny+8 ] += 1.0
@@ -265,7 +267,7 @@ def run_perseus( ):
         print outname
         print ""
 
-        pers.perseus( 'scubtop', fname, outname )
+        pers.perseus( fname, outname )
 
 def make_figures():
     """

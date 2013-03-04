@@ -58,6 +58,26 @@ def write_file ( fname, output ):
                 text . write (str(int(data[i][j])) + "\n")
     text . close()
 
+def write_sparse_array( arr, output, ndim=2 ):
+    """
+    Write an array to *sparse* Perseus format.
+    
+    arr -- numpy ndarray
+
+    output -- name (full path) of output file
+
+    NOTE -- 
+    """
+    with open( output, 'w' ) as fh:
+        fh.write( str( arr.ndim )+'\n' )
+        for i in xrange( arr.shape[0] ): 
+            for j in xrange( arr.shape[1] ):
+                if int( arr[i,j] ) != 0:
+                    pos = str(i) + ' ' + str(j) + ' '
+                    fh.write (pos + str(int( arr[i,j] )) + "\n")
+        
+    
+
 def write_sparse_file ( fname, output=None ):
     """
     fname -- filename without extension. Extension must be .txt or .npy.

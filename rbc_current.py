@@ -77,8 +77,8 @@ def normalize_mid_lifespan( gens, eps0, eps1 ):
 
 def normalize(arr, imin=0, imax=1, dmin=None, dmax=None):
     """
-    Normalize our data, in-place. (stolen from stack
-    overload. surprised numpy doesn't have a built-in normalize
+    Normalize 'arr', in-place. (Stolen from stack
+    overload. Surprised numpy doesn't have a built-in normalize
     function.)
 
     (imin, max) -- desired range of normalization

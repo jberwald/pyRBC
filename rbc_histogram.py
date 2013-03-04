@@ -1411,7 +1411,7 @@ if __name__ == "__main__":
             old, new = load_birth_times( old_, new_ )
             BT[eps]['old'] = old
             BT[eps]['new'] = new
-    
+            
     if 0:
         # find the old maxes. do these in sequence to avoid killing
         # the disk with thousands of minute searches (sigh).
